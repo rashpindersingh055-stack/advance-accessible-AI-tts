@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  vision-max-studio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vision_max_neural_studio
+    ports:
+      - "8000:8000"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - DATABASE_URL=sqlite:///./backend/vision_max_studio.db
+      - PORT=8000
+    volumes:
+      - ./backend/data:/app/backend/data
+    restart: unless-stopped

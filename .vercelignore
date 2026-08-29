@@ -1,0 +1,18 @@
+.git
+.github
+.gemini
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.local
+.venv
+env/
+venv/
+node_modules
+*.db
+backend/vision_max_studio.db
+start_studio.bat
+start_studio.ps1
+Vision Max Studio - Neural TTS.txt

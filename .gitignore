@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+*/node_modules/
+venv/
+.venv/
+env/
+*/venv/
+*/.venv/
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.*.local
+*.env
+
+# SQLite Local Database
+*.db
+backend/*.db
+backend/vision_max_studio.db
+backend/saved_api_config.json
+
+# Python Cache
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Build Outputs
+dist/
+build/
+frontend/dist/
+frontend/build/
+
+# IDE & OS Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.gemini/
