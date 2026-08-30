@@ -190,3 +190,30 @@ export const SAMPLE_SCRIPTS = [
     text: 'It is two in the morning across the city. The rain is drumming against the studio window, and wherever you are listening tonight, you are not alone.'
   }
 ];
+
+export const SAMPLE_DIALOGUE = [
+  {
+    id: 'line-1',
+    speaker_name: 'Host Alex',
+    voice_id: 'Kore',
+    style_id: 'warm',
+    text: 'Welcome back to Future Frontiers. Today we explore how neural intelligence is revolutionizing audio synthesis.',
+    pause_after_ms: 400
+  },
+  {
+    id: 'line-2',
+    speaker_name: 'Dr. Evelyn',
+    voice_id: 'Zephyr',
+    style_id: 'natural',
+    text: 'Thanks Alex. The key milestone is achieving sub-harmonic timbre accuracy and emotional cadence in real time.',
+    pause_after_ms: 500
+  },
+  {
+    id: 'line-3',
+    speaker_name: 'Marcus',
+    voice_id: 'Fenrir',
+    style_id: 'dramatic',
+    text: 'And when you combine that with zero-latency edge streaming, the boundaries between recorded and synthesized voices completely disappear.',
+    pause_after_ms: 450
+  }
+];
