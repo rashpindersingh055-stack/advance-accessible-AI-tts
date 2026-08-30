@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Sparkles, Settings, Info, Radio, Layers, Sliders, History, Code2, User, LogOut, Edit3, ShieldCheck, ChevronDown } from 'lucide-react';
+import { Mic, Sparkles, Settings, Info, Radio, Layers, Sliders, History, Code2, User, LogOut, Edit3, ShieldCheck, ChevronDown, Bot } from 'lucide-react';
 import BrandLogo from './BrandLogo';
 
 export default function Navbar({
@@ -17,6 +17,7 @@ export default function Navbar({
   const profileMenuRef = useRef(null);
 
   const navTabs = [
+    { id: 'agent', label: 'AI Speech Director', icon: Bot, badge: 'AI Agent', highlight: true },
     { id: 'single', label: 'Neural Studio', icon: Mic, badge: 'Standard' },
     { id: 'dialogue', label: 'Multi-Speaker Podcast', icon: Layers, badge: 'Pro' },
     { id: 'effects', label: 'Audio FX & DSP', icon: Sliders },
@@ -54,14 +55,16 @@ export default function Navbar({
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all relative ${
                   isActive
                     ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/30'
+                    : tab.highlight
+                    ? 'text-indigo-300 hover:text-white hover:bg-indigo-950/40 border border-indigo-500/20'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-indigo-400'}`} />
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : tab.highlight ? 'text-indigo-400 animate-pulse' : 'text-indigo-400'}`} />
                 <span>{tab.label}</span>
                 {tab.badge && (
                   <span className={`text-[9px] px-1.5 py-0.2 rounded-md ${
-                    isActive ? 'bg-white/20 text-white' : 'bg-slate-800 text-indigo-300'
+                    isActive ? 'bg-white/20 text-white' : tab.highlight ? 'bg-indigo-950 text-indigo-300 border border-indigo-700/50' : 'bg-slate-800 text-indigo-300'
                   }`}>
                     {tab.badge}
                   </span>

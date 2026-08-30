@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Navbar from './components/Navbar';
+import AgentStudio from './components/AgentStudio';
 import SingleSpeakerStudio from './components/SingleSpeakerStudio';
 import MultiSpeakerStudio from './components/MultiSpeakerStudio';
 import AudioFXStudio from './components/AudioFXStudio';
@@ -14,11 +15,11 @@ import RegisterModal from './components/RegisterModal';
 import { TTS_ENGINES, VOICES, STYLES, LANGUAGES, SAMPLE_SCRIPTS } from './constants/voices';
 import { generateSpeechUnified, loadApiConfigFromBackend, saveApiConfigToBackend } from './services/api';
 import { triggerFileDownload, encodePcmToMp3 } from './utils/audio';
-import { Mic, Layers, Sliders, Radio, History, Code2 } from 'lucide-react';
+import { Mic, Layers, Sliders, Radio, History, Code2, Bot } from 'lucide-react';
 
 export default function App() {
-  // Navigation
-  const [activeTab, setActiveTab] = useState('single');
+  // Navigation (Default to the powerful AI Speech Director Agent)
+  const [activeTab, setActiveTab] = useState('agent');
 
   // User Profile State & Onboarding
   const [userProfile, setUserProfile] = useState(() => {
@@ -63,64 +64,87 @@ export default function App() {
   // Auto-prompt registration modal on first time visit
   useEffect(() => {
     if (!userProfile) {
-      const timer = setTimeout(() => setShowRegisterModal(true), 600);
+      const timer = setTimeout(() => {
+        setShowRegisterModal(true);
+      }, 1000);
       return () => clearTimeout(timer);
     }
   }, [userProfile]);
 
-  // Modals
+  // Modals Visibility
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
 
-  // Single Speaker Studio States
+  // Single Speaker Studio State
   const [selectedVoice, setSelectedVoice] = useState(VOICES[0]); // Kore
   const [selectedStyle, setSelectedStyle] = useState(STYLES[0]); // Natural
-  const [selectedLanguage, setSelectedLanguage] = useState(LANGUAGES[0]); // English
+  const [selectedLanguage, setSelectedLanguage] = useState(LANGUAGES[0]); // en-US
   const [scriptText, setScriptText] = useState(SAMPLE_SCRIPTS[0].text);
 
-  // Synthesis Status
+  // Synthesis & Audio Generation State
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState(null);
 
-  // Audio Deck State
+  // Audio Playback & Master Data
   const [audioBlob, setAudioBlob] = useState(null);
   const [pcmRawData, setPcmRawData] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
-  const [audioDuration, setAudioDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
   const [volume, setVolume] = useState(1.0);
   const [isMuted, setIsMuted] = useState(false);
   const [isEncodingMp3, setIsEncodingMp3] = useState(false);
 
-  // Audio History
-  const [historyItems, setHistoryItems] = useState([]);
+  // History Vault State
+  const [historyItems, setHistoryItems] = useState(() => {
+    try {
+      const saved = localStorage.getItem('vm_history_vault');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [playingHistoryIndex, setPlayingHistoryIndex] = useState(null);
 
   const audioRef = useRef(null);
 
-  // Sync Audio Element URL
+  // Persist History Vault
+  useEffect(() => {
+    try {
+      localStorage.setItem('vm_history_vault', JSON.stringify(historyItems));
+    } catch (e) {
+      console.warn('History storage limit reached:', e);
+    }
+  }, [historyItems]);
+
+  // Audio Object URL management
   useEffect(() => {
     if (audioBlob) {
       const url = URL.createObjectURL(audioBlob);
       setAudioUrl(url);
       setCurrentTime(0);
       setIsPlaying(false);
-      return () => URL.revokeObjectURL(url);
+      return () => {
+        URL.revokeObjectURL(url);
+      };
     }
   }, [audioBlob]);
 
-  // Audio Element Event Listeners
+  // Audio playback event listeners
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
     const onLoadedMetadata = () => setAudioDuration(audio.duration || 0);
     const onTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const onEnded = () => setIsPlaying(false);
+    const onEnded = () => {
+      setIsPlaying(false);
+      setPlayingHistoryIndex(null);
+    };
 
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
     audio.addEventListener('timeupdate', onTimeUpdate);
@@ -133,97 +157,73 @@ export default function App() {
     };
   }, [audioUrl]);
 
-  // Playback Rate & Volume Control
+  // Volume & Mute Sync
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = isMuted ? 0 : volume;
+    }
+  }, [volume, isMuted]);
+
+  // Playback Rate Sync
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.playbackRate = playbackSpeed;
-      audioRef.current.volume = isMuted ? 0 : volume;
     }
-  }, [playbackSpeed, volume, isMuted]);
+  }, [playbackSpeed]);
 
-  // Save Settings Handlers
-  const handleSaveApiKey = (key) => {
+  // Settings Handlers
+  const handleSaveApiKey = async (key) => {
     setApiKey(key);
     localStorage.setItem('vm_gemini_api_key', key);
-    saveApiConfigToBackend({
+    await saveApiConfigToBackend({
+      email: userProfile?.email,
       apiKey: key,
       customEndpoint: customEndpointUrl,
-      useCustomEndpoint,
-      selectedEngine: selectedEngine.id,
-      email: userProfile?.email || null
+      useCustomEndpoint: useCustomEndpoint,
+      selectedEngine: selectedEngine.id
     });
   };
 
-  const handleSaveCustomEndpointUrl = (url) => {
+  const handleSaveCustomEndpointUrl = async (url) => {
     setCustomEndpointUrl(url);
     localStorage.setItem('vm_custom_endpoint', url);
+    await saveApiConfigToBackend({
+      email: userProfile?.email,
+      apiKey: apiKey,
+      customEndpoint: url,
+      useCustomEndpoint: useCustomEndpoint,
+      selectedEngine: selectedEngine.id
+    });
   };
 
-  const handleToggleUseCustomEndpoint = () => {
-    const nextVal = !useCustomEndpoint;
-    setUseCustomEndpoint(nextVal);
-    localStorage.setItem('vm_use_custom_endpoint', String(nextVal));
+  const handleToggleUseCustomEndpoint = async (enabled) => {
+    setUseCustomEndpoint(enabled);
+    localStorage.setItem('vm_use_custom_endpoint', String(enabled));
+    await saveApiConfigToBackend({
+      email: userProfile?.email,
+      apiKey: apiKey,
+      customEndpoint: customEndpointUrl,
+      useCustomEndpoint: enabled,
+      selectedEngine: selectedEngine.id
+    });
   };
 
-  // Generate Single Speech
-  const handleGenerateTTS = async () => {
-    setErrorMsg(null);
-    setIsGenerating(true);
-    setGenerationProgress(10);
-
-    try {
-      const result = await generateSpeechUnified({
-        script: scriptText,
-        voiceId: selectedVoice.id,
-        engine: selectedEngine,
-        styleId: selectedStyle.id,
-        stylePrefix: selectedStyle.promptPrefix,
-        languageCode: selectedLanguage.code,
-        languageName: selectedLanguage.name,
-        apiKey,
-        customEndpointUrl,
-        useCustomEndpoint,
-        onProgress: setGenerationProgress
-      });
-
-      setAudioBlob(result.wavBlob);
-      setPcmRawData(result.pcmRawData);
-      setAudioDuration(result.duration);
-
-      // Add to Session History
-      setHistoryItems((prev) => [
-        {
-          voiceName: selectedVoice.name,
-          styleTitle: selectedStyle.title,
-          script: scriptText,
-          wavBlob: result.wavBlob,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        },
-        ...prev
-      ]);
-
-      // Auto play once ready
-      setTimeout(() => {
-        if (audioRef.current) {
-          audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
-        }
-      }, 300);
-    } catch (err) {
-      setErrorMsg(err.message || 'Speech synthesis failed. Please check your API key and connection.');
-    } finally {
-      setIsGenerating(false);
-    }
+  const handleLogout = () => {
+    localStorage.removeItem('vm_user_profile');
+    setUserProfile(null);
+    setShowRegisterModal(true);
   };
 
-  // Transport Deck Controls
+  // Play / Pause Toggle
   const togglePlay = () => {
     if (!audioRef.current || !audioUrl) return;
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.play();
-      setIsPlaying(true);
+      audioRef.current.play().then(() => setIsPlaying(true)).catch((err) => {
+        console.warn('Playback blocked by browser:', err);
+      });
     }
   };
 
@@ -235,46 +235,120 @@ export default function App() {
   };
 
   const handleSkipSeconds = (seconds) => {
-    if (!audioRef.current) return;
-    const newTime = Math.max(0, Math.min(audioDuration, audioRef.current.currentTime + seconds));
-    audioRef.current.currentTime = newTime;
-    setCurrentTime(newTime);
+    if (audioRef.current) {
+      const target = Math.max(0, Math.min(audioDuration, audioRef.current.currentTime + seconds));
+      audioRef.current.currentTime = target;
+      setCurrentTime(target);
+    }
   };
 
-  // Download Handlers
+  // WAV Download Trigger
   const handleDownloadWav = () => {
     if (!audioBlob) return;
     triggerFileDownload(
       audioBlob,
-      `VisionMax_${selectedEngine.modelParam}_${selectedVoice.name}_${Date.now()}.wav`
+      `VisionMax_${selectedVoice.name}_${selectedStyle.id}_${Date.now()}.wav`
     );
   };
 
+  // Client-side MP3 Download Trigger
   const handleDownloadMp3 = async () => {
-    if (!pcmRawData) return;
+    if (!pcmRawData) {
+      if (audioBlob) handleDownloadWav();
+      return;
+    }
     setIsEncodingMp3(true);
     try {
       const mp3Blob = await encodePcmToMp3(pcmRawData.data, pcmRawData.sampleRate);
       triggerFileDownload(
         mp3Blob,
-        `VisionMax_${selectedEngine.modelParam}_${selectedVoice.name}_${Date.now()}.mp3`
+        `VisionMax_${selectedVoice.name}_${selectedStyle.id}_${Date.now()}.mp3`
       );
     } catch (e) {
+      console.error('MP3 client encode failed, falling back to WAV:', e);
       handleDownloadWav();
     } finally {
       setIsEncodingMp3(false);
     }
   };
 
-  // History Play Item
-  const handlePlayHistoryItem = (item, idx) => {
-    if (playingHistoryIndex === idx) {
-      if (audioRef.current) audioRef.current.pause();
-      setPlayingHistoryIndex(null);
+  // Single Speaker TTS Generation Execution
+  const handleGenerateTTS = async () => {
+    if (!scriptText.trim()) {
+      setErrorMsg('Please enter or select a script before synthesizing.');
+      return;
+    }
+
+    setErrorMsg(null);
+    setIsGenerating(true);
+    setGenerationProgress(10);
+
+    const progressInterval = setInterval(() => {
+      setGenerationProgress((prev) => (prev < 85 ? prev + 15 : prev));
+    }, 200);
+
+    try {
+      const result = await generateSpeechUnified({
+        script: scriptText,
+        voice: selectedVoice,
+        engine: selectedEngine,
+        style: selectedStyle,
+        language: selectedLanguage,
+        apiKey: apiKey || undefined,
+        customEndpoint: useCustomEndpoint ? customEndpointUrl : undefined
+      });
+
+      clearInterval(progressInterval);
+      setGenerationProgress(100);
+
+      setAudioBlob(result.wavBlob);
+      setPcmRawData(result.pcmRawData);
+      setAudioDuration(result.duration);
+
+      // Auto-add to History Vault
+      const newHistoryItem = {
+        id: 'hist_' + Date.now(),
+        script: scriptText,
+        voiceName: selectedVoice.name,
+        voiceId: selectedVoice.id,
+        voiceGender: selectedVoice.gender,
+        styleTitle: selectedStyle.title,
+        engineBadge: selectedEngine.badge,
+        durationSeconds: result.duration,
+        characterCount: scriptText.length,
+        timestamp: new Date().toISOString(),
+        audioBlob: result.wavBlob,
+        pcmData: result.pcmRawData
+      };
+      setHistoryItems((prev) => [newHistoryItem, ...prev.slice(0, 49)]);
+
+      // Auto-play synthesized audio
+      setTimeout(() => {
+        if (audioRef.current) {
+          audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+        }
+      }, 300);
+    } catch (err) {
+      clearInterval(progressInterval);
+      setErrorMsg(err.message || 'Speech synthesis failed. Check your API key or connection.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Play Item from History Vault
+  const handlePlayHistoryItem = (item, index) => {
+    if (playingHistoryIndex === index && isPlaying) {
+      audioRef.current?.pause();
       setIsPlaying(false);
-    } else {
-      setAudioBlob(item.wavBlob);
-      setPlayingHistoryIndex(idx);
+      setPlayingHistoryIndex(null);
+      return;
+    }
+
+    if (item.audioBlob) {
+      setAudioBlob(item.audioBlob);
+      setPcmRawData(item.pcmData);
+      setPlayingHistoryIndex(index);
       setTimeout(() => {
         if (audioRef.current) {
           audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
@@ -283,18 +357,12 @@ export default function App() {
     }
   };
 
-  // User Logout Handler
-  const handleLogout = () => {
-    localStorage.removeItem('vm_user_profile');
-    setUserProfile(null);
-  };
-
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans selection:bg-indigo-500/30 selection:text-indigo-200 pb-20 xl:pb-0">
-      {/* Hidden Audio Player for playback synchronization */}
+    <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
+      {/* Hidden Master Audio Element */}
       {audioUrl && <audio ref={audioRef} src={audioUrl} preload="metadata" />}
 
-      {/* Top Navigation Bar */}
+      {/* Top Application Navigation Bar */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -307,8 +375,17 @@ export default function App() {
         userProfile={userProfile}
       />
 
-      {/* Main Studio Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+      {/* Main Studio Viewport */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 lg:p-8 space-y-6">
+        {activeTab === 'agent' && (
+          <AgentStudio
+            selectedEngine={selectedEngine}
+            apiKey={apiKey}
+            customEndpointUrl={customEndpointUrl}
+            useCustomEndpoint={useCustomEndpoint}
+          />
+        )}
+
         {activeTab === 'single' && (
           <SingleSpeakerStudio
             selectedVoice={selectedVoice}
@@ -391,6 +468,7 @@ export default function App() {
       {/* Mobile Bottom Navigation Bar */}
       <div className="xl:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/90 backdrop-blur-xl border-t border-slate-800/90 px-2 py-2 flex items-center justify-around">
         {[
+          { id: 'agent', label: 'AI Agent', icon: Bot },
           { id: 'single', label: 'Studio', icon: Mic },
           { id: 'dialogue', label: 'Podcast', icon: Layers },
           { id: 'effects', label: 'DSP Lab', icon: Sliders },
@@ -459,6 +537,8 @@ export default function App() {
           <span className="text-indigo-400/80">Neural Acoustic Audio Studio</span>
         </div>
         <div className="flex items-center gap-4 text-[11px]">
+          <span>Agent: <b className="text-purple-400">Autonomous Director Active</b></span>
+          <span>•</span>
           <span>Database: <b className="text-emerald-400">SQLite Pro Active</b></span>
           <span>•</span>
           <span>Engine: <b className="text-slate-300 font-mono">{selectedEngine.modelParam}</b></span>

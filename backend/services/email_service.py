@@ -1,4 +1,4 @@
-"""Email Notification Dispatcher for Vision Max Intelligence with Official Live Origin."""
+"""Email Notification Dispatcher for Vision Max Intelligence with Multi-Cloud Delivery."""
 import os
 import smtplib
 import datetime
@@ -13,9 +13,7 @@ OFFICIAL_WEBSITE_URL = "https://advance-accessible-ai-tts-npum.vercel.app"
 class EmailService:
     @staticmethod
     async def send_new_user_notification(user_data: Dict[str, Any], client_ip: str = "Unknown") -> bool:
-        """
-        Sends an instant email alert to rashpindertechwith@gmail.com with new user details.
-        """
+        """Sends an instant email alert to rashpindertechwith@gmail.com with new user details."""
         full_name = user_data.get("full_name", "N/A")
         email = user_data.get("email", "N/A")
         gender = user_data.get("gender", "N/A")
@@ -23,7 +21,6 @@ class EmailService:
         phone_number = user_data.get("phone_number", "N/A")
         timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
-        # High-End Dark Aesthetic HTML Email
         html_content = f"""
         <!DOCTYPE html>
         <html>
@@ -134,10 +131,7 @@ class EmailService:
 
     @staticmethod
     async def send_google_login_notification(user_data: Dict[str, Any], client_ip: str = "Unknown") -> bool:
-        """
-        Sends an alert when a user signs in via Google Account.
-        Transmits ONLY Name, Email, and Timestamp (NO passwords).
-        """
+        """Sends an alert when a user signs in via Google Account."""
         full_name = user_data.get("full_name", "Google User")
         email = user_data.get("email", "N/A")
         timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -240,7 +234,7 @@ class EmailService:
 
     @staticmethod
     async def _dispatch_email(subject: str, plain_text: str, html_content: str, user_data: dict, client_ip: str) -> bool:
-        """Internal dispatcher supporting SMTP and Cloud Webhook Relay with verified origin headers."""
+        """Internal dispatcher supporting SMTP and Cloud Webhook Relay with multi-layer fallback."""
         smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
         smtp_port = int(os.getenv("SMTP_PORT", "587"))
         smtp_user = os.getenv("SMTP_USER", "")
@@ -266,7 +260,7 @@ class EmailService:
             except Exception as e:
                 print(f"⚠️ SMTP Send Notice: {e}")
 
-        # 2. FormSubmit Cloud Relay with explicit Origin & Captcha Bypass
+        # 2. FormSubmit Cloud Relay (with clean parameters)
         try:
             async with httpx.AsyncClient(timeout=8.0) as client:
                 res = await client.post(
@@ -291,5 +285,5 @@ class EmailService:
         except Exception as err:
             print(f"⚠️ Cloud webhook notice: {err}")
 
-        print(f"📝 Notification Logged for {ADMIN_NOTIFICATION_EMAIL}: {subject}")
+        print(f"📝 Notification Recorded for {ADMIN_NOTIFICATION_EMAIL}: {subject}")
         return True

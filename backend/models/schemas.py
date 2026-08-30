@@ -39,6 +39,35 @@ class ApiConfigResponse(BaseModel):
     use_custom_endpoint: bool = False
     selected_engine: str = "gemini-2.5-flash-preview-tts"
 
+# --- AI Speech Director Agent Models ---
+class AgentScriptRequest(BaseModel):
+    prompt: str = Field(..., min_length=3, max_length=1000, description="User story prompt (e.g. 4 people in a horror story)")
+    genre: str = Field(default="Horror & Suspense", description="Genre or mood of the story")
+    num_speakers: int = Field(default=4, ge=1, le=6, description="Number of distinct character voices")
+    length: Literal["Short", "Medium", "Long"] = Field(default="Medium", description="Target length")
+    api_key: Optional[str] = Field(default=None, description="Gemini API key")
+
+class CharacterProfile(BaseModel):
+    name: str
+    role: str
+    voice_id: str
+    gender: str
+
+class DialogueSegment(BaseModel):
+    speaker_name: str = Field(default="Speaker 1", description="Speaker display label")
+    voice_id: str = Field(default="Kore", description="Voice ID for this line")
+    style_id: str = Field(default="natural", description="Emotion style for this line")
+    text: str = Field(..., description="Spoken dialogue text")
+    pause_after_ms: int = Field(default=400, ge=0, le=5000, description="Silence pause after segment in ms")
+
+class AgentProductionResponse(BaseModel):
+    status: str = "success"
+    title: str
+    synopsis: str
+    genre: str
+    characters: List[CharacterProfile]
+    dialogue: List[DialogueSegment]
+
 # --- Neural TTS & Studio Models ---
 class TTSSingleRequest(BaseModel):
     script: str = Field(..., max_length=7000, description="Input script or dialogue text")
@@ -53,13 +82,6 @@ class TTSSingleRequest(BaseModel):
     sample_rate: Optional[int] = Field(default=24000, description="Target sample rate in Hz")
     speed: Optional[float] = Field(default=1.0, ge=0.5, le=2.0, description="Playback speed modifier")
     pitch_semitones: Optional[float] = Field(default=0.0, ge=-12.0, le=12.0, description="Pitch shift in semitones")
-
-class DialogueSegment(BaseModel):
-    speaker_name: str = Field(default="Speaker 1", description="Speaker display label")
-    voice_id: str = Field(default="Kore", description="Voice ID for this line")
-    style_id: str = Field(default="natural", description="Emotion style for this line")
-    text: str = Field(..., description="Spoken dialogue text")
-    pause_after_ms: int = Field(default=400, ge=0, le=5000, description="Silence pause after segment in ms")
 
 class MultiSpeakerRequest(BaseModel):
     dialogue: List[DialogueSegment] = Field(..., description="Ordered list of dialogue lines")

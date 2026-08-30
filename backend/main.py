@@ -23,6 +23,7 @@ try:
     from backend.routers.dialogue import router as dialogue_router
     from backend.routers.effects import router as effects_router
     from backend.routers.auth import router as auth_router
+    from backend.routers.agent import router as agent_router
     from backend.middleware.firewall import SecurityFirewallMiddleware
     from backend.services.gemini_tts import GeminiTTSService
 except (ImportError, ModuleNotFoundError):
@@ -30,6 +31,7 @@ except (ImportError, ModuleNotFoundError):
     from routers.dialogue import router as dialogue_router
     from routers.effects import router as effects_router
     from routers.auth import router as auth_router
+    from routers.agent import router as agent_router
     from middleware.firewall import SecurityFirewallMiddleware
     from services.gemini_tts import GeminiTTSService
 
@@ -37,7 +39,7 @@ load_dotenv()
 
 app = FastAPI(
     title="Vision Max Intelligence — Neural TTS Studio API",
-    description="Enterprise-Grade Multi-modal Voice Synthesis, User Onboarding Database, and Audio DSP Engine protected with WAF & Firewall.",
+    description="Enterprise-Grade Multi-modal Voice Synthesis, Autonomous AI Speech Director Agent, User Onboarding Database, and Audio DSP Engine protected with WAF & Firewall.",
     version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -67,6 +69,7 @@ app.add_middleware(
 
 # 4. Include API Routers
 app.include_router(auth_router)
+app.include_router(agent_router)
 app.include_router(tts_router)
 app.include_router(dialogue_router)
 app.include_router(effects_router)
@@ -90,6 +93,7 @@ async def root(request: Request):
     return {
         "service": "Vision Max Intelligence Neural TTS Studio",
         "version": "2.0.0",
+        "features": ["30-Voice Neural TTS", "Autonomous AI Speech Director Agent", "Multi-Speaker Podcast Sequencer", "Audio DSP Lab"],
         "status": "online",
         "firewall_status": "active & protecting",
         "docs": "/docs",
@@ -110,6 +114,7 @@ async def root(request: Request):
 async def health_check():
     return {
         "status": "healthy",
+        "agent": "ready",
         "firewall": "protected",
         "engine": "ready",
         "database": "connected",
