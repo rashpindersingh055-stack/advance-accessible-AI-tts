@@ -1,4 +1,4 @@
-"""Autonomous AI Speech Director & Scriptwriter Agent powered by Google Gemini."""
+"""Autonomous AI Speech Director & Scriptwriter Agent using Official Google Gemini Models."""
 import os
 import json
 import re
@@ -25,24 +25,52 @@ VOICES_LIST = [
 
 STYLE_IDS = ["natural", "dramatic", "whispering", "warm", "commercial", "empathetic", "cheer", "mysterious", "intense", "storyteller"]
 
+# Official Google Gemini Scriptwriting / Reasoning Models
+OFFICIAL_SCRIPT_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-3.1-flash",
+    "gemini-flash-latest",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro"
+]
+
 class AIAgentDirectorService:
+    @staticmethod
+    def _clean_json_response(raw_text: str) -> Dict[str, Any]:
+        """Robust multi-layer JSON parser for Gemini outputs."""
+        text = raw_text.strip()
+        if text.startswith("```json"):
+            text = text[7:]
+        elif text.startswith("```"):
+            text = text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
+
+        try:
+            return json.loads(text)
+        except Exception:
+            match = re.search(r"(\{[\s\S]*\})", text)
+            if match:
+                return json.loads(match.group(1))
+            raise ValueError(f"Unable to parse structured JSON from model output: {raw_text[:200]}")
+
     @staticmethod
     async def create_and_humanize_audio_story(
         prompt: str,
         genre: str = "Horror & Suspense",
         num_speakers: int = 4,
         length: str = "Medium",
+        model_name: Optional[str] = None,
         api_key: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Multi-Step Autonomous Workflow:
-        1. Writes an immersive multi-speaker audio drama/story.
-        2. Humanizes dialogues with natural speech inflections, breath pauses, and realistic emotional cues.
-        3. Maps distinct character personas to the optimal neural voice IDs from the 30-voice catalog.
+        Autonomous Multi-Speaker Scriptwriting & Casting via Google Gemini v1beta API.
         """
         key = api_key or os.getenv("GEMINI_API_KEY", "")
         if not key:
-            raise ValueError("Google Gemini API Key is required to power the AI Speech Agent. Please set your API key in Settings.")
+            raise ValueError("Google Gemini API Key is required. Please set your API key in Settings.")
 
         system_instruction = f"""
         You are a World-Class Hollywood Audio Drama Director, Master Scriptwriter, and Dialogue Humanizer.
@@ -54,19 +82,19 @@ class AIAgentDirectorService:
         AVAILABLE EMOTION STYLES:
         {json.dumps(STYLE_IDS)}
 
-        GUIDELINES FOR THE AI AGENT:
+        GUIDELINES:
         1. SCRIPT CREATION: Craft a compelling story with {num_speakers} distinct characters in the '{genre}' genre based on: "{prompt}".
         2. HUMANIZER PASS:
-           - Make dialogue sound 100% human and unscripted.
-           - Add natural conversational hesitation, emotional gasps, whisper directions, and authentic cadence.
-           - Ensure each character has a unique speaking style, vocabulary, and temperament.
+           - Make dialogue sound 100% human, authentic, and unscripted.
+           - Add natural conversational pauses ('...'), emotional inflections, stuttered hesitations, and realistic subtext.
+           - Give each character a distinct personality, vocabulary, and rhythm.
         3. CASTING & PACING:
            - Assign a distinct, complementary voice_id to each character from the list above.
            - Assign appropriate style_id (e.g. 'dramatic', 'whispering', 'intense', 'mysterious') to each line.
-           - Add dramatic pause_after_ms (between 250ms and 900ms) to create cinematic tension.
+           - Add dramatic pause_after_ms (between 250ms and 800ms) to create cinematic tension.
 
         OUTPUT FORMAT:
-        You MUST respond ONLY with a clean, valid JSON object with this exact structure:
+        You MUST respond ONLY with a clean JSON object with this exact structure:
         {{
           "title": "Short Gripping Title",
           "synopsis": "Brief 1-2 sentence dramatic summary",
@@ -74,7 +102,7 @@ class AIAgentDirectorService:
           "characters": [
             {{
               "name": "Character Name",
-              "role": "Archetype / Description (e.g. Skeptical Investigator)",
+              "role": "Role / Archetype",
               "voice_id": "Charon",
               "gender": "Male"
             }}
@@ -84,7 +112,7 @@ class AIAgentDirectorService:
               "speaker_name": "Character Name",
               "voice_id": "Charon",
               "style_id": "mysterious",
-              "text": "Humanized spoken line with emotion and natural cadence...",
+              "text": "Humanized spoken line...",
               "pause_after_ms": 400
             }}
           ]
@@ -98,53 +126,71 @@ class AIAgentDirectorService:
         }.get(length, "10 to 14 dialogue exchanges")
 
         user_content = f"""
-        Create a high-impact multi-speaker audio drama production for:
+        Create a master multi-character audio drama production:
         PROMPT: {prompt}
         GENRE: {genre}
         NUMBER OF CHARACTERS: {num_speakers}
         TARGET LENGTH: {length_guide}
 
-        Deliver the fully humanized, casted JSON output now.
+        Deliver the complete humanized JSON production script now.
         """
 
-        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={key}"
-        
-        payload = {
-            "contents": [
-                {"role": "user", "parts": [{"text": f"{system_instruction}\n\n{user_content}"}]}
-            ],
-            "generationConfig": {
-                "temperature": 0.85,
-                "topP": 0.95,
-                "responseMimeType": "application/json"
-            }
-        }
+        # Candidate models list with user choice prioritized
+        candidate_models = []
+        if model_name and model_name.strip():
+            candidate_models.append(model_name.strip())
+        for m in OFFICIAL_SCRIPT_MODELS:
+            if m not in candidate_models:
+                candidate_models.append(m)
+
+        last_error = None
 
         async with httpx.AsyncClient(timeout=45.0) as client:
-            try:
-                res = await client.post(endpoint, json=payload)
-                if not res.ok:
-                    # Fallback to gemini-1.5-flash if 2.5 is unavailable
-                    fb_endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={key}"
-                    res = await client.post(fb_endpoint, json=payload)
+            for model_id in candidate_models:
+                endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={key}"
+                
+                # Official SystemInstruction + Structured JSON
+                payload = {
+                    "systemInstruction": {
+                        "parts": [{"text": system_instruction}]
+                    },
+                    "contents": [
+                        {"role": "user", "parts": [{"text": user_content}]}
+                    ],
+                    "generationConfig": {
+                        "temperature": 0.85,
+                        "topP": 0.95,
+                        "maxOutputTokens": 8192,
+                        "responseMimeType": "application/json"
+                    }
+                }
+
+                try:
+                    res = await client.post(endpoint, json=payload)
                     if not res.ok:
-                        err_json = res.json()
-                        raise ValueError(err_json.get("error", {}).get("message", f"HTTP {res.status_code}"))
-                
-                resp_json = res.json()
-                raw_text = resp_json["candidates"][0]["content"]["parts"][0]["text"]
-                
-                # Clean JSON markdown if present
-                clean_json_str = raw_text.strip()
-                if clean_json_str.startswith("```json"):
-                    clean_json_str = clean_json_str[7:]
-                if clean_json_str.startswith("```"):
-                    clean_json_str = clean_json_str[3:]
-                if clean_json_str.endswith("```"):
-                    clean_json_str = clean_json_str[:-3]
-                
-                data = json.loads(clean_json_str.strip())
-                return data
-            except Exception as e:
-                # If JSON parsing or API failed, raise descriptive error
-                raise ValueError(f"AI Speech Agent generation error: {str(e)}")
+                        # Fallback payload with combined parts
+                        fallback_payload = {
+                            "contents": [
+                                {"role": "user", "parts": [{"text": f"{system_instruction}\n\n{user_content}"}]}
+                            ],
+                            "generationConfig": {
+                                "temperature": 0.85,
+                                "topP": 0.95,
+                                "maxOutputTokens": 8192
+                            }
+                        }
+                        res = await client.post(endpoint, json=fallback_payload)
+
+                    if res.ok:
+                        resp_json = res.json()
+                        raw_text = resp_json["candidates"][0]["content"]["parts"][0]["text"]
+                        data = AIAgentDirectorService._clean_json_response(raw_text)
+                        data["model_used"] = model_id
+                        return data
+                    else:
+                        last_error = f"{model_id}: HTTP {res.status_code} - {res.text[:120]}"
+                except Exception as ex:
+                    last_error = f"{model_id}: {str(ex)}"
+                    continue
+
+        raise ValueError(f"AI Script Generation failed across all Gemini models. Last error: {last_error}")

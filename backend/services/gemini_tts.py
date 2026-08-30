@@ -1,4 +1,4 @@
-"""Enterprise-Grade Gemini Neural Speech Synthesis Engine Client with Caching & Resilience."""
+"""Official Google Gemini Neural Speech Synthesis Engine Client."""
 import os
 import re
 import time
@@ -6,51 +6,59 @@ import base64
 import hashlib
 import asyncio
 import httpx
-from typing import Dict, Any, Optional, Tuple, AsyncGenerator
+from typing import Dict, Any, Optional, Tuple, List
 from collections import OrderedDict
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Engine Metadata Catalog
+# Official Google Gemini TTS Models
 TTS_ENGINES = {
     "gemini-2.5-flash-preview-tts": {
         "id": "gemini-2.5-flash-preview-tts",
-        "name": "Gemini 2.5 Flash Native TTS (Standard / Stable)",
-        "badge": "Standard Engine",
-        "desc": "High-speed, native multimodal 24kHz studio synthesis with full prompt emotion steering.",
+        "name": "Gemini 2.5 Flash Native TTS (Official Standard)",
+        "badge": "Standard Stable",
+        "desc": "Official Google 24kHz studio synthesis with native emotion and cadence steering.",
         "modelParam": "gemini-2.5-flash-preview-tts",
+        "apiVersion": "v1beta"
+    },
+    "gemini-3.1-flash-tts-preview": {
+        "id": "gemini-3.1-flash-tts-preview",
+        "name": "Gemini 3.1 Flash Neural Audio (Next-Gen Preview)",
+        "badge": "v3.1 Preview",
+        "desc": "Ultra-low latency expressive cadence with nuanced breath control.",
+        "modelParam": "gemini-3.1-flash-tts-preview",
         "apiVersion": "v1beta"
     },
     "gemini-3.1-flash-tts": {
         "id": "gemini-3.1-flash-tts",
-        "name": "Gemini 3.1 Flash Neural Audio (Next-Gen)",
-        "badge": "Latest Gen",
-        "desc": "Ultra-low latency expressive cadence with nuanced breath control and realism.",
+        "name": "Gemini 3.1 Flash Neural Audio (Standard)",
+        "badge": "v3.1 Flash",
+        "desc": "High-fidelity audio generation with granular prosodic nuance.",
         "modelParam": "gemini-3.1-flash-tts",
-        "apiVersion": "v1beta"
-    },
-    "gemini-3-pro-tts": {
-        "id": "gemini-3-pro-tts",
-        "name": "Gemini 3 Pro Cinematic TTS (Studio Master)",
-        "badge": "Pro Master",
-        "desc": "Highest fidelity dramatic resonance with extended harmonic depth.",
-        "modelParam": "gemini-3-pro-tts",
         "apiVersion": "v1beta"
     },
     "gemini-2.5-pro-tts": {
         "id": "gemini-2.5-pro-tts",
-        "name": "Gemini 2.5 Pro High-Fidelity TTS (Legacy Pro)",
-        "badge": "Legacy Pro",
-        "desc": "Deep multi-timbre synthesis tuned for long-form narration and audiobooks.",
+        "name": "Gemini 2.5 Pro High-Fidelity TTS (Master)",
+        "badge": "Pro Master",
+        "desc": "Deep multi-timbre synthesis tuned for cinematic long-form narration.",
         "modelParam": "gemini-2.5-pro-tts",
+        "apiVersion": "v1beta"
+    },
+    "gemini-3-pro-tts": {
+        "id": "gemini-3-pro-tts",
+        "name": "Gemini 3 Pro Cinematic TTS",
+        "badge": "Pro Studio",
+        "desc": "Dramatic acoustic resonance with extended harmonic depth.",
+        "modelParam": "gemini-3-pro-tts",
         "apiVersion": "v1beta"
     }
 }
 
-# LRU In-Memory Audio Cache (Capacity: 250 items)
+# LRU In-Memory Audio Cache (Capacity: 300 items)
 class AudioCache:
-    def __init__(self, capacity: int = 250):
+    def __init__(self, capacity: int = 300):
         self.cache: OrderedDict[str, Tuple[bytes, int]] = OrderedDict()
         self.capacity = capacity
         self.hits = 0
@@ -69,17 +77,18 @@ class AudioCache:
         self.misses += 1
         return None
 
-    def set(self, prompt: str, voice_id: str, engine_id: str, value: Tuple[bytes, int]):
+    def put(self, prompt: str, voice_id: str, engine_id: str, pcm_bytes: bytes, sample_rate: int = 24000):
         key = self._get_key(prompt, voice_id, engine_id)
         if key in self.cache:
             self.cache.move_to_end(key)
-        self.cache[key] = value
-        if len(self.cache) > self.capacity:
-            self.cache.popitem(last=False)
+        else:
+            if len(self.cache) >= self.capacity:
+                self.cache.popitem(last=False)
+        self.cache[key] = (pcm_bytes, sample_rate)
 
-    def stats(self) -> dict:
+    def stats(self) -> Dict[str, Any]:
         total = self.hits + self.misses
-        hit_rate = round((self.hits / total * 100), 1) if total > 0 else 0.0
+        hit_rate = round((self.hits / total * 100), 2) if total > 0 else 0.0
         return {
             "cached_entries": len(self.cache),
             "capacity": self.capacity,
@@ -88,44 +97,29 @@ class AudioCache:
             "hit_rate_percent": hit_rate
         }
 
+    def clear(self):
+        self.cache.clear()
+        self.hits = 0
+        self.misses = 0
+
 
 class GeminiTTSService:
-    _instance = None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(GeminiTTSService, cls).__new__(cls)
-            cls._instance._init_service()
-        return cls._instance
-
-    def _init_service(self):
-        self.default_api_key = os.getenv("GEMINI_API_KEY", "")
+    def __init__(self):
+        self.client = httpx.AsyncClient(timeout=45.0)
         self.cache = AudioCache(capacity=300)
-        # Persistent HTTP client connection pool with keep-alive
-        self.client = httpx.AsyncClient(
-            timeout=httpx.Timeout(connect=10.0, read=45.0, write=15.0, pool=30.0),
-            limits=httpx.Limits(max_keepalive_connections=50, max_connections=100),
-            http2=True
-        )
+        self.default_api_key = os.getenv("GEMINI_API_KEY", "")
 
-    def get_endpoint_url(self, engine_id: str, api_key: str, custom_endpoint: Optional[str] = None) -> str:
+    def get_endpoint_url(self, model_param: str, api_key: str, custom_endpoint: Optional[str] = None) -> str:
         if custom_endpoint and custom_endpoint.strip():
-            return custom_endpoint.strip()
-            
-        engine = TTS_ENGINES.get(engine_id, TTS_ENGINES["gemini-2.5-flash-preview-tts"])
-        api_ver = engine["apiVersion"]
-        model = engine["modelParam"]
-        return f"https://generativelanguage.googleapis.com/{api_ver}/models/{model}:generateContent?key={api_key}"
+            base = custom_endpoint.rstrip("/")
+            if "key=" in base:
+                return base
+            sep = "&" if "?" in base else "?"
+            return f"{base}{sep}key={api_key}"
 
-    @staticmethod
-    def parse_sample_rate(mime_type: Optional[str]) -> int:
-        if not mime_type:
-            return 24000
-        match = re.search(r'rate=(\d+)', mime_type, re.IGNORECASE)
-        return int(match.group(1)) if match else 24000
+        return f"https://generativelanguage.googleapis.com/v1beta/models/{model_param}:generateContent?key={api_key}"
 
-    async def diagnose_connection(self, api_key: Optional[str] = None) -> dict:
-        """Performs a live diagnostic health check and latency ping against Google Gemini API."""
+    async def test_connection(self, api_key: Optional[str] = None) -> Dict[str, Any]:
         effective_key = (api_key or self.default_api_key or "").strip()
         if not effective_key:
             return {
@@ -173,22 +167,31 @@ class GeminiTTSService:
         use_cache: bool = True
     ) -> Tuple[bytes, int]:
         """
-        Synthesizes text prompt into raw 16-bit PCM bytes and sample rate.
-        Includes LRU caching, multi-engine fallback matrix, and jittered exponential retry.
+        Synthesizes text prompt into raw 16-bit PCM bytes using Google Gemini Official TTS.
         """
         prompt_clean = prompt.strip()
         if not prompt_clean:
             raise ValueError("Prompt text cannot be empty.")
 
-        # Check Cache
         if use_cache:
             cached_val = self.cache.get(prompt_clean, voice_id, engine_id)
             if cached_val is not None:
                 return cached_val
 
         effective_key = (api_key or self.default_api_key or "").strip()
-        endpoint = self.get_endpoint_url(engine_id, effective_key, custom_endpoint)
 
+        # Official Google Gemini TTS models fallback list
+        fallback_models = [
+            engine_id,
+            "gemini-2.5-flash-preview-tts",
+            "gemini-3.1-flash-tts-preview",
+            "gemini-3.1-flash-tts",
+            "gemini-2.5-pro-tts",
+            "gemini-3-pro-tts"
+        ]
+        candidate_models = list(dict.fromkeys(fallback_models))
+
+        # Official Google SpeechConfig Payload
         payload = {
             "contents": [
                 {
@@ -204,107 +207,75 @@ class GeminiTTSService:
                         }
                     }
                 }
-            },
-            "model": engine_id
+            }
         }
 
-        # Jittered retry delays (1s, 2s, 4s, 8s)
-        delays = [1.0, 2.0, 4.0, 8.0]
         last_error = None
-        response_json = None
 
-        # Fallback engine hierarchy
-        fallback_engines = ["gemini-2.5-flash-preview-tts", "gemini-3.1-flash-tts", "gemini-3-pro-tts"]
+        for current_model in candidate_models:
+            endpoint = self.get_endpoint_url(current_model, effective_key, custom_endpoint)
 
-        for attempt in range(len(delays) + 1):
             try:
-                res = await self.client.post(
-                    endpoint,
-                    headers={"Content-Type": "application/json"},
-                    json=payload
-                )
-
+                res = await self.client.post(endpoint, json=payload, timeout=45.0)
                 if res.status_code == 200:
                     response_json = res.json()
-                    break
-                
-                # Parse structured API error
-                error_detail = res.text
-                try:
-                    err_obj = res.json()
-                    error_detail = err_obj.get("error", {}).get("message", error_detail)
-                except Exception:
-                    pass
-
-                # Specific HTTP status handling
-                if res.status_code in (401, 403):
-                    raise Exception(f"Authentication Error (HTTP {res.status_code}): Invalid or unauthorized Gemini API Key. {error_detail}")
-                elif res.status_code == 429:
-                    # Rate limit / Quota exceeded -> Wait longer and retry
-                    last_error = Exception(f"Rate Limit / Quota Exceeded (HTTP 429): {error_detail}")
-                else:
-                    last_error = Exception(f"HTTP {res.status_code}: {error_detail}")
-
-            except Exception as e:
-                last_error = e
-                # Fallback engine on final attempt if custom endpoint was not forced
-                if attempt == len(delays) and not custom_endpoint:
-                    for fb_engine in fallback_engines:
-                        if fb_engine != engine_id:
-                            try:
-                                fb_url = self.get_endpoint_url(fb_engine, effective_key)
-                                fb_payload = {**payload, "model": fb_engine}
-                                fb_res = await self.client.post(fb_url, json=fb_payload)
-                                if fb_res.status_code == 200:
-                                    response_json = fb_res.json()
+                    inline_data = None
+                    try:
+                        candidates = response_json.get("candidates", [])
+                        if candidates:
+                            parts = candidates[0].get("content", {}).get("parts", [])
+                            for part in parts:
+                                if "inlineData" in part:
+                                    inline_data = part["inlineData"]
                                     break
-                            except Exception:
-                                pass
-                    if response_json:
-                        break
+                    except Exception as parse_ex:
+                        raise ValueError(f"Failed to parse audio payload: {parse_ex}")
 
-                if attempt < len(delays):
-                    # Exponential delay with jitter
-                    sleep_time = delays[attempt] + (0.1 * attempt)
-                    await asyncio.sleep(sleep_time)
+                    if not inline_data:
+                        continue
 
-        if not response_json:
-            raise Exception(f"Synthesis failed after retries: {str(last_error)}")
+                    audio_base64 = inline_data.get("data", "")
+                    mime_type = inline_data.get("mimeType", "")
+                    
+                    sample_rate = 24000
+                    if "rate=" in mime_type:
+                        match = re.search(r"rate=(\d+)", mime_type)
+                        if match:
+                            sample_rate = int(match.group(1))
 
-        try:
-            candidate = response_json.get("candidates", [])[0]
-            part = candidate.get("content", {}).get("parts", [])[0]
-            inline_data = part.get("inlineData", {})
-            b64_audio = inline_data.get("data")
-            mime_type = inline_data.get("mimeType", "audio/L16;rate=24000")
+                    pcm_bytes = base64.b64decode(audio_base64)
 
-            if not b64_audio:
-                raise Exception("Response missing inline audio binary data.")
+                    if use_cache:
+                        self.cache.put(prompt_clean, voice_id, engine_id, pcm_bytes, sample_rate)
 
-            pcm_bytes = base64.b64decode(b64_audio)
-            sample_rate = self.parse_sample_rate(mime_type)
+                    return pcm_bytes, sample_rate
+                else:
+                    last_error = f"Model {current_model} returned HTTP {res.status_code}: {res.text[:140]}"
+            except Exception as e:
+                last_error = f"Model {current_model} error: {str(e)}"
+                continue
 
-            # Store in cache
-            if use_cache:
-                self.cache.set(prompt_clean, voice_id, engine_id, (pcm_bytes, sample_rate))
+        raise ValueError(f"Speech synthesis failed across all Gemini models. Last error: {last_error}")
 
-            return pcm_bytes, sample_rate
-        except Exception as e:
-            raise Exception(f"Audio payload decoding error: {str(e)}")
-
-    async def stream_audio_chunks(
+    async def synthesize_speech(
         self,
-        prompt: str,
+        script: str,
         voice_id: str = "Kore",
         engine_id: str = "gemini-2.5-flash-preview-tts",
-        chunk_size: int = 4096
-    ) -> AsyncGenerator[bytes, None]:
-        """Streams synthesized PCM/WAV audio in real-time chunks."""
-        pcm_bytes, sample_rate = await self.synthesize(prompt, voice_id, engine_id)
-        from .audio_processor import AudioProcessor
-        wav_bytes = AudioProcessor.pcm16_to_wav(pcm_bytes, sample_rate=sample_rate)
+        api_key: Optional[str] = None,
+        custom_endpoint: Optional[str] = None,
+        output_format: str = "wav"
+    ) -> Tuple[bytes, float]:
+        """Convenience method returning standard WAV bytes and duration."""
+        pcm_bytes, sample_rate = await self.synthesize(
+            prompt=script,
+            voice_id=voice_id,
+            engine_id=engine_id,
+            api_key=api_key,
+            custom_endpoint=custom_endpoint
+        )
 
-        # Stream in 4KB chunks
-        for i in range(0, len(wav_bytes), chunk_size):
-            yield wav_bytes[i:i + chunk_size]
-            await asyncio.sleep(0.005) # Yield control
+        from backend.services.audio_processor import AudioProcessor
+        wav_bytes = AudioProcessor.pcm16_to_wav(pcm_bytes, sample_rate=sample_rate, num_channels=1)
+        duration_sec = len(pcm_bytes) / (sample_rate * 2)
+        return wav_bytes, round(duration_sec, 2)

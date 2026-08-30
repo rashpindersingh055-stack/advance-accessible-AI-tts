@@ -2,19 +2,35 @@
 
 export const TTS_ENGINES = [
   {
+    id: 'gemini-3.6-flash-preview-tts',
+    name: 'Gemini 3.6 Flash Neural Audio (Ultra Next-Gen)',
+    badge: 'v3.6 Flash',
+    desc: 'Cutting-edge dynamic audio synthesis with state-of-the-art breath cadence and emotion responsiveness.',
+    modelParam: 'gemini-3.6-flash-preview-tts',
+    apiVersion: 'v1beta'
+  },
+  {
+    id: 'gemini-3.5-flash-tts',
+    name: 'Gemini 3.5 Flash Expressive TTS',
+    badge: 'v3.5 Flash',
+    desc: 'Ultra-high speed 24kHz studio rendering with granular prosodic control.',
+    modelParam: 'gemini-3.5-flash-tts',
+    apiVersion: 'v1beta'
+  },
+  {
+    id: 'gemini-3.1-flash-tts',
+    name: 'Gemini 3.1 Flash Neural Audio',
+    badge: 'v3.1 Flash',
+    desc: 'Nuanced speech cadence, breath modulation, and ultra-low latency.',
+    modelParam: 'gemini-3.1-flash-tts',
+    apiVersion: 'v1beta'
+  },
+  {
     id: 'gemini-2.5-flash-preview-tts',
     name: 'Gemini 2.5 Flash Native TTS (Standard / Stable)',
     badge: 'Standard Engine',
     desc: 'High-speed, native multimodal 24kHz studio synthesis with full prompt emotion steering.',
     modelParam: 'gemini-2.5-flash-preview-tts',
-    apiVersion: 'v1beta'
-  },
-  {
-    id: 'gemini-3.1-flash-tts',
-    name: 'Gemini 3.1 Flash Neural Audio (Next-Gen)',
-    badge: 'Latest Gen',
-    desc: 'Ultra-low latency expressive cadence with nuanced breath control and realism.',
-    modelParam: 'gemini-3.1-flash-tts',
     apiVersion: 'v1beta'
   },
   {
@@ -58,145 +74,119 @@ export const VOICES = [
   { id: 'Achernar', name: 'Achernar', gender: 'Male', tone: 'Warm Corporate', desc: 'Balanced, trustworthy institutional voice' },
   { id: 'Alnilam', name: 'Alnilam', gender: 'Male', tone: 'Crisp Broadcast', desc: 'Studio news and financial updates' },
   { id: 'Schedar', name: 'Schedar', gender: 'Female', tone: 'Confident & Direct', desc: 'Motivational speech and leadership voice' },
-  { id: 'Gacrux', name: 'Gacrux', gender: 'Male', tone: 'Sonorous & Low', desc: 'Epic trailer and character narration' },
-  { id: 'Pulcherrima', name: 'Pulcherrima', gender: 'Female', tone: 'Sophisticated', desc: 'Fine arts, high couture and culture' },
-  { id: 'Achird', name: 'Achird', gender: 'Male', tone: 'Friendly Companion', desc: 'Interactive AI persona and gaming NPC' },
-  { id: 'Zubenelgenubi', name: 'Zubenelgenubi', gender: 'Male', tone: 'Mysterious Baritone', desc: 'Fiction audiobooks and audio drama' },
-  { id: 'Vindemiatrix', name: 'Vindemiatrix', gender: 'Female', tone: 'Polished Presenter', desc: 'International keynote speaker' },
-  { id: 'Sadachbia', name: 'Sadachbia', gender: 'Female', tone: 'Empathetic & Caring', desc: 'Supportive guidance and mental wellness' },
-  { id: 'Sadaltager', name: 'Sadaltager', gender: 'Male', tone: 'Earthy & Sincere', desc: 'Conversational realism with character' },
-  { id: 'Sulafat', name: 'Sulafat', gender: 'Female', tone: 'Crystal Clear', desc: 'Sharp, immaculate enunciation for learning' }
+  { id: 'Deneb', name: 'Deneb', gender: 'Female', tone: 'Warm Educator', desc: 'Patient instructional narration' },
+  { id: 'Castor', name: 'Castor', gender: 'Male', tone: 'Friendly Specialist', desc: 'Explainer videos and tech audio' },
+  { id: 'Pollux', name: 'Pollux', gender: 'Male', tone: 'Resonant Baritone', desc: 'Dramatic movie trailer style' },
+  { id: 'Sirius', name: 'Sirius', gender: 'Male', tone: 'Punchy Commercial', desc: 'High-energy advertising voice' },
+  { id: 'Vega', name: 'Vega', gender: 'Female', tone: 'Modern Tech', desc: 'AI assistant and crisp UX voice' },
+  { id: 'Capella', name: 'Capella', gender: 'Female', tone: 'Warm Host', desc: 'Podcast host and interviewer' },
+  { id: 'Rigel', name: 'Rigel', gender: 'Male', tone: 'Deep Authority', desc: 'Scientific documentaries and nature films' },
+  { id: 'Betelgeuse', name: 'Betelgeuse', gender: 'Male', tone: 'Dramatic Grit', desc: 'Suspense thriller and character narration' }
 ];
 
 export const STYLES = [
   {
     id: 'natural',
     title: 'Natural Conversational',
-    desc: 'Fluid, everyday realistic speech with organic pacing.',
-    promptPrefix: 'Speak in a completely natural, warm, and conversational everyday tone: '
+    desc: 'Relaxed, human, organic pacing and authentic cadence.',
+    promptPrefix: 'Speak in a completely natural, relaxed, and conversational tone: '
   },
   {
-    id: 'cheerful',
-    title: 'Cheerful & Energetic',
-    desc: 'High enthusiasm, bright smile in the voice, and vibrant energy.',
-    promptPrefix: 'Say cheerfully and with high enthusiasm and energy: '
-  },
-  {
-    id: 'deeply_emotional',
-    title: 'Deeply Emotional & Empathetic',
-    desc: 'Heartfelt, profound sentiment with gentle pauses.',
-    promptPrefix: 'Say with profound emotional depth, warmth, and heartfelt empathy: '
+    id: 'dramatic',
+    title: 'Cinematic Dramatic',
+    desc: 'High emotional tension, rich harmonic resonance, theatrical timing.',
+    promptPrefix: 'Deliver this with intense dramatic weight, emotional gravity, and cinematic pauses: '
   },
   {
     id: 'whispering',
-    title: 'Mysterious & Whispering',
-    desc: 'Intimate breathy suspense, low volume and intrigue.',
-    promptPrefix: 'Say in an intriguing, soft, breathless whisper with suspense: '
+    title: 'Intimate Whisper & ASMR',
+    desc: 'Soft, close-mic, hushed breathing and delicate acoustic resonance.',
+    promptPrefix: 'Whisper this in a soft, intimate, hushed tone with close-mic breathiness: '
   },
   {
-    id: 'news_anchor',
-    title: 'Authoritative News Anchor',
-    desc: 'Sharp, professional enunciation with journalistic authority.',
-    promptPrefix: 'Deliver in a confident, authoritative, articulate broadcast news anchor style: '
+    id: 'warm',
+    title: 'Warm Podcast Host',
+    desc: 'Inviting, friendly, articulate broadcast presence.',
+    promptPrefix: 'Speak as an engaging, warm, and inviting podcast host: '
   },
   {
-    id: 'cinematic',
-    title: 'Inspiring & Cinematic',
-    desc: 'Stirring, epic trailer pacing with uplifting resonance.',
-    promptPrefix: 'Speak in a grand, cinematic, deeply inspirational and stirring tone: '
+    id: 'commercial',
+    title: 'Energetic Commercial',
+    desc: 'Punchy, enthusiastic, modern promotional delivery.',
+    promptPrefix: 'Deliver this in an energetic, upbeat, punchy commercial presentation style: '
   },
   {
-    id: 'meditative',
-    title: 'Calm & Meditative',
-    desc: 'Ultra-soothing, relaxed cadence designed for mindfulness.',
-    promptPrefix: 'Say in a soothing, relaxed, gentle, and mindful meditative cadence: '
+    id: 'empathetic',
+    title: 'Empathetic & Caring',
+    desc: 'Gentle, understanding, compassionate voice.',
+    promptPrefix: 'Speak with deep empathy, kindness, warmth, and supportive compassion: '
+  },
+  {
+    id: 'cheer',
+    title: 'Cheerful & Upbeat',
+    desc: 'Bright, smiling, positive, sunlit delivery.',
+    promptPrefix: 'Deliver this with cheerful brightness, joy, and an upbeat smile: '
+  },
+  {
+    id: 'mysterious',
+    title: 'Eerie & Mysterious',
+    desc: 'Chilling, shadowy, suspenseful narration.',
+    promptPrefix: 'Speak in a dark, mysterious, suspenseful, and chilling tone: '
+  },
+  {
+    id: 'intense',
+    title: 'Urgent & Intense',
+    desc: 'Fast-paced, emergency, high-stakes adrenaline.',
+    promptPrefix: 'Deliver this with rapid urgency, high stakes, and intense adrenaline: '
   },
   {
     id: 'storyteller',
-    title: 'Dramatic Storyteller',
-    desc: 'Vivid theatrical inflection, tension building, and dynamic rhythm.',
-    promptPrefix: 'Narrate with high theatrical drama, dynamic tension, and vivid expressive pacing: '
-  },
-  {
-    id: 'executive',
-    title: 'Professional Executive',
-    desc: 'Refined corporate poise, decisive and articulate.',
-    promptPrefix: 'Present in a polished, crisp, sophisticated corporate and professional tone: '
-  },
-  {
-    id: 'sarcastic',
-    title: 'Sarcastic & Witty',
-    desc: 'Playful irony, dry humor, and expressive smirks.',
-    promptPrefix: 'Deliver with playful sarcasm, witty inflections, and dry irony: '
+    title: 'Classic Audio Storyteller',
+    desc: 'Immersive storybook reading with rich character inflection.',
+    promptPrefix: 'Read this as a master storyteller creating an enchanting immersive world: '
   }
 ];
 
 export const LANGUAGES = [
   { code: 'en-US', name: 'English (United States)', flag: '🇺🇸' },
   { code: 'en-GB', name: 'English (United Kingdom)', flag: '🇬🇧' },
-  { code: 'es-ES', name: 'Spanish (Español)', flag: '🇪🇸' },
-  { code: 'fr-FR', name: 'French (Français)', flag: '🇫🇷' },
-  { code: 'de-DE', name: 'German (Deutsch)', flag: '🇩🇪' },
-  { code: 'ja-JP', name: 'Japanese (日本語)', flag: '🇯🇵' },
-  { code: 'hi-IN', name: 'Hindi (हिन्दी)', flag: '🇮🇳' },
-  { code: 'zh-CN', name: 'Chinese (Mandarin / 中文)', flag: '🇨🇳' },
-  { code: 'pt-BR', name: 'Portuguese (Português)', flag: '🇧🇷' },
-  { code: 'it-IT', name: 'Italian (Italiano)', flag: '🇮🇹' },
-  { code: 'ar-SA', name: 'Arabic (العربية)', flag: '🇸🇦' },
-  { code: 'ko-KR', name: 'Korean (한국어)', flag: '🇰🇷' },
-  { code: 'ru-RU', name: 'Russian (Русский)', flag: '🇷🇺' }
+  { code: 'en-AU', name: 'English (Australia)', flag: '🇦🇺' },
+  { code: 'en-IN', name: 'English (India)', flag: '🇮🇳' },
+  { code: 'es-ES', name: 'Spanish (Spain)', flag: '🇪🇸' },
+  { code: 'es-MX', name: 'Spanish (Mexico)', flag: '🇲🇽' },
+  { code: 'fr-FR', name: 'French (France)', flag: '🇫🇷' },
+  { code: 'de-DE', name: 'German (Germany)', flag: '🇩🇪' },
+  { code: 'it-IT', name: 'Italian (Italy)', flag: '🇮🇹' },
+  { code: 'ja-JP', name: 'Japanese (Japan)', flag: '🇯🇵' },
+  { code: 'ko-KR', name: 'Korean (South Korea)', flag: '🇰🇷' },
+  { code: 'pt-BR', name: 'Portuguese (Brazil)', flag: '🇧🇷' },
+  { code: 'hi-IN', name: 'Hindi (India)', flag: '🇮🇳' },
+  { code: 'zh-CN', name: 'Chinese (Mandarin)', flag: '🇨🇳' }
 ];
 
 export const SAMPLE_SCRIPTS = [
   {
-    label: '🎙️ Studio Launch',
-    text: 'Welcome to Vision Max Intelligence Neural Studio. By harmonizing state-of-the-art vocal synthesis with authentic emotional inflection, we transform raw script into breathtaking spoken art.'
+    id: 'studio_intro',
+    title: 'Studio Welcome',
+    category: 'Welcome',
+    text: 'Welcome to Vision Max Intelligence Neural Studio. This platform combines multimodal Google Gemini speech models with studio-grade acoustic rendering to deliver ultra-natural voice synthesis.'
   },
   {
-    label: '🌌 Deep Space',
-    text: 'Beyond the orbit of Neptune lies the Kuiper belt, a vast frontier of frozen relics from the dawn of our solar system. Out here, silence reigns supreme, waiting for humanity’s next great leap.'
+    id: 'nature_doc',
+    title: 'Nature Documentary',
+    category: 'Cinematic',
+    text: 'Deep within the ancient rainforest, where morning mist hangs suspended between centuries-old cedar trees, the forest awakens in a symphony of sound.'
   },
   {
-    label: '💡 Product Keynote',
-    text: 'Today, we are thrilled to unveil an entirely reimagined acoustic architecture. It is not merely faster; it is profoundly more personal, expressive, and undeniably human.'
+    id: 'tech_keynote',
+    title: 'Product Launch Keynote',
+    category: 'Commercial',
+    text: 'Today, we are thrilled to unveil the next leap in acoustic intelligence. A system designed from the ground up to render human cadence with unprecedented emotional nuance.'
   },
   {
-    label: '🧘 Mindfulness Guide',
-    text: 'Take a long, deep breath in through your nose... hold it gently... and release all tension as you exhale. Allow the quiet stillness of this present moment to settle within you.'
-  },
-  {
-    label: '📰 Broadcast News',
-    text: 'Good evening. Breaking developments today in artificial intelligence research, as scientists announce revolutionary advancements in real-time neural auditory synthesis.'
-  },
-  {
-    label: '🎬 Cinematic Trailer',
-    text: 'In a world where echoes shape destiny, one voice will rise above the storm. Witness the untold legend unfold across eternity.'
-  }
-];
-
-export const SAMPLE_DIALOGUE = [
-  {
-    id: 'line-1',
-    speaker_name: 'Dr. Elena Vance',
-    voice_id: 'Kore',
-    style_id: 'executive',
-    text: 'Commander, the deep-space telemetry signals are aligning with the predicted frequency harmonics.',
-    pause_after_ms: 500
-  },
-  {
-    id: 'line-2',
-    speaker_name: 'Captain Marcus',
-    voice_id: 'Charon',
-    style_id: 'cinematic',
-    text: 'Incredible. Prepare the quantum audio transceiver. If this broadcast reaches them, history changes forever.',
-    pause_after_ms: 600
-  },
-  {
-    id: 'line-3',
-    speaker_name: 'AI System Nova',
-    voice_id: 'Zephyr',
-    style_id: 'natural',
-    text: 'Transceiver online. Neural synthesis frequency locked at 24 kilohertz. Ready for transmission on your command.',
-    pause_after_ms: 300
+    id: 'late_night_radio',
+    title: 'Late Night Radio',
+    category: 'Podcast',
+    text: 'It is two in the morning across the city. The rain is drumming against the studio window, and wherever you are listening tonight, you are not alone.'
   }
 ];

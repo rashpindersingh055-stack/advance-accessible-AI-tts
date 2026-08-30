@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Bot, Sparkles, Play, Pause, Download, Wand2, Volume2, Users, RefreshCw, 
-  Layers, CheckCircle2, AlertCircle, Film, Edit3, Trash2, Plus, ArrowRight, ShieldCheck, HeartHandshake
+  Layers, CheckCircle2, AlertCircle, Film, Edit3, Trash2, Plus, ArrowRight, ShieldCheck, HeartHandshake, Cpu
 } from 'lucide-react';
 import AudioVisualizer from './AudioVisualizer';
 import { VOICES, STYLES } from '../constants/voices';
@@ -18,6 +18,7 @@ export default function AgentStudio({
   const [genre, setGenre] = useState('Horror & Suspense');
   const [numSpeakers, setNumSpeakers] = useState(4);
   const [targetLength, setTargetLength] = useState('Medium');
+  const [scriptModel, setScriptModel] = useState('gemini-2.5-flash');
 
   // Agent Progress Stages
   const [isAgentWorking, setIsAgentWorking] = useState(false);
@@ -113,7 +114,7 @@ export default function AgentStudio({
     try {
       // Step 1: Brainstorming & Drafting Plot
       setAgentStep(1);
-      setAgentStepText(`Drafting dramatic narrative with ${numSpeakers} characters via Gemini AI...`);
+      setAgentStepText(`Drafting dramatic narrative with ${numSpeakers} characters via ${scriptModel}...`);
 
       const res = await fetch('/api/agent/generate-script', {
         method: 'POST',
@@ -123,6 +124,7 @@ export default function AgentStudio({
           genre,
           num_speakers: parseInt(numSpeakers, 10),
           length: targetLength,
+          model_name: scriptModel,
           api_key: apiKey || null
         })
       });
@@ -145,19 +147,20 @@ export default function AgentStudio({
     }
   };
 
-  // Direct Browser Fallback for Script Creation with Gemini
+  // Direct Browser Fallback for Script Creation with Gemini Flash
   const generateDirectBrowserScript = async () => {
     if (!apiKey) {
       throw new Error('Google Gemini API Key is required. Please set your API key in Settings.');
     }
 
-    const systemPrompt = `You are an AI Audio Drama Director. Write a humanized multi-speaker dialogue script in JSON for:
+    const systemPrompt = `You are a World-Class Hollywood Audio Drama Director, Master Scriptwriter, and Dialogue Humanizer.
+    Transform the prompt into a humanized multi-speaker dialogue script in JSON.
     PROMPT: ${promptText}
     GENRE: ${genre}
     SPEAKERS: ${numSpeakers}
     LENGTH: ${targetLength}
 
-    Return JSON:
+    Return strictly valid JSON:
     {
       "title": "Title",
       "synopsis": "Synopsis",
@@ -171,23 +174,44 @@ export default function AgentStudio({
       ]
     }`;
 
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: systemPrompt }] }],
-        generationConfig: { responseMimeType: "application/json" }
-      })
-    });
+    const modelsToTry = [scriptModel, 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3.1-flash', 'gemini-flash-latest', 'gemini-1.5-flash', 'gemini-1.5-pro'];
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `HTTP ${res.status}`);
+    for (const modelId of modelsToTry) {
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [{ text: systemPrompt }]
+            },
+            contents: [
+              { role: "user", parts: [{ text: `Create the production script for: ${promptText}` }] }
+            ],
+            generationConfig: {
+              temperature: 0.85,
+              topP: 0.95,
+              maxOutputTokens: 8192,
+              responseMimeType: "application/json"
+            }
+          })
+        });
+
+        if (res.ok) {
+          const resJson = await res.json();
+          const raw = resJson.candidates[0].content.parts[0].text;
+          const clean = raw.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/```$/, '').trim();
+          const parsed = JSON.parse(clean);
+          parsed.model_used = modelId;
+          return parsed;
+        }
+      } catch (e) {
+        continue;
+      }
     }
 
-    const resJson = await res.json();
-    return JSON.parse(resJson.candidates[0].content.parts[0].text);
+    throw new Error('Script generation failed. Please verify your Google Gemini API key.');
   };
 
   // Step 3: Studio Multi-Speaker Audio Synthesis
@@ -395,7 +419,7 @@ export default function AgentStudio({
 
           <div className="flex items-center gap-2 p-3 bg-slate-900/80 rounded-2xl border border-slate-800 text-xs text-slate-300 shrink-0">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Powered by <b>Google Gemini 2.5</b> + <b>Neural Studio TTS</b></span>
+            <span>Powered by <b>Google Gemini Flash</b> + <b>Neural Studio TTS</b></span>
           </div>
         </div>
       </div>
@@ -466,6 +490,26 @@ export default function AgentStudio({
               <Film className="w-4 h-4 text-purple-400" />
               <span>Director Controls</span>
             </h3>
+
+            {/* Script Creator Model */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <Cpu className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Scriptwriter AI Model</span>
+              </label>
+              <select
+                value={scriptModel}
+                onChange={(e) => setScriptModel(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="gemini-2.5-flash">⚡ Gemini 2.5 Flash (Official Workhorse &amp; Ultra-Fast)</option>
+                <option value="gemini-2.5-pro">🎬 Gemini 2.5 Pro (Deep Cinematic Storyteller)</option>
+                <option value="gemini-3.1-flash">🚀 Gemini 3.1 Flash (Next-Gen Intelligence)</option>
+                <option value="gemini-flash-latest">✨ Gemini Flash Latest (Auto-Updated Release)</option>
+                <option value="gemini-1.5-flash">⚡ Gemini 1.5 Flash (High Speed Stable)</option>
+                <option value="gemini-1.5-pro">🎭 Gemini 1.5 Pro (Deep Reasoning)</option>
+              </select>
+            </div>
 
             {/* Genre */}
             <div className="space-y-1.5">
@@ -587,9 +631,16 @@ export default function AgentStudio({
           <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
               <div>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-950 text-purple-300 border border-purple-800 uppercase">
-                  {productionData.genre}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-950 text-purple-300 border border-purple-800 uppercase">
+                    {productionData.genre}
+                  </span>
+                  {productionData.model_used && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-950 text-indigo-300 border border-indigo-800">
+                      ⚡ {productionData.model_used}
+                    </span>
+                  )}
+                </div>
                 <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight mt-1.5">
                   {productionData.title}
                 </h2>
