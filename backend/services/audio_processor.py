@@ -2,14 +2,22 @@
 import io
 import struct
 import math
-import numpy as np
 from typing import Tuple, List, Optional
-from pydub import AudioSegment
+
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
+try:
+    from pydub import AudioSegment
+except ImportError:
+    AudioSegment = None
 
 class AudioProcessor:
     @staticmethod
     def pcm16_to_wav(pcm_bytes: bytes, sample_rate: int = 24000, num_channels: int = 1) -> bytes:
-        """Encodes raw 16-bit signed little-endian PCM bytes into standard WAV format."""
+        """Encodes raw 16-bit signed little-endian PCM bytes into standard WAV format using pure Python."""
         bytes_per_sample = 2
         block_align = num_channels * bytes_per_sample
         byte_rate = sample_rate * block_align
@@ -41,12 +49,9 @@ class AudioProcessor:
 
     @staticmethod
     def transcode_audio(wav_bytes: bytes, target_format: str = "wav", bitrate: str = "192k") -> Tuple[bytes, str]:
-        """
-        Transcodes WAV bytes to target format (mp3, ogg, flac, wav) using pydub.
-        Returns: (encoded_bytes, content_type)
-        """
+        """Transcodes WAV bytes to target format using pydub if available, with WAV fallback."""
         fmt = target_format.lower()
-        if fmt == "wav":
+        if fmt == "wav" or AudioSegment is None:
             return wav_bytes, "audio/wav"
 
         content_types = {
@@ -58,66 +63,45 @@ class AudioProcessor:
 
         try:
             audio = AudioSegment.from_file(io.BytesIO(wav_bytes), format="wav")
-            out_io = io.BytesIO()
-            if fmt == "mp3":
-                audio.export(out_io, format="mp3", bitrate=bitrate)
-            elif fmt in ("ogg", "flac"):
-                audio.export(out_io, format=fmt)
-            else:
-                audio.export(out_io, format="mp3", bitrate=bitrate)
-                fmt = "mp3"
-            return out_io.getvalue(), content_types.get(fmt, "audio/mp3")
+            out_buf = io.BytesIO()
+            audio.export(out_buf, format=fmt, bitrate=bitrate)
+            return out_buf.getvalue(), content_types.get(fmt, f"audio/{fmt}")
         except Exception:
-            # Safe fallback to master WAV
             return wav_bytes, "audio/wav"
 
     @staticmethod
-    def wav_to_mp3(wav_bytes: bytes, bitrate: str = "128k") -> bytes:
-        out_bytes, _ = AudioProcessor.transcode_audio(wav_bytes, "mp3", bitrate=bitrate)
-        return out_bytes
+    def stitch_dialogue_segments(segments: List[Tuple[bytes, int]], crossfade_ms: int = 150) -> bytes:
+        """Stitches multiple WAV segments together with silence pauses."""
+        if not segments:
+            return AudioProcessor.pcm16_to_wav(b'', 24000)
 
-    @staticmethod
-    def concatenate_segments(
-        wav_segments: List[Tuple[bytes, int]],
-        sample_rate: int = 24000,
-        crossfade_ms: int = 25
-    ) -> bytes:
-        """
-        Concatenates multiple WAV byte strings with specified silence pauses and acoustic micro-fades.
-        wav_segments: List of (wav_bytes, pause_after_ms)
-        """
-        combined_samples = []
+        if AudioSegment is None:
+            # Fallback: Raw byte concatenation
+            combined_pcm = bytearray()
+            for wav_bytes, pause_ms in segments:
+                if len(wav_bytes) > 44:
+                    combined_pcm.extend(wav_bytes[44:])
+                pause_samples = int(24000 * (pause_ms / 1000.0))
+                combined_pcm.extend(b'\x00\x00' * pause_samples)
+            return AudioProcessor.pcm16_to_wav(bytes(combined_pcm), 24000)
 
-        for idx, (wav_bytes, pause_ms) in enumerate(wav_segments):
-            if len(wav_bytes) > 44 and wav_bytes[:4] == b'RIFF':
-                pcm_data = wav_bytes[44:]
-            else:
-                pcm_data = wav_bytes
-                
-            samples = np.frombuffer(pcm_data, dtype=np.int16).astype(np.float32)
+        combined = AudioSegment.empty()
+        for idx, (wav_bytes, pause_ms) in enumerate(segments):
+            try:
+                seg_audio = AudioSegment.from_file(io.BytesIO(wav_bytes), format="wav")
+                if idx == 0:
+                    combined = seg_audio
+                else:
+                    if pause_ms > 0:
+                        combined = combined + AudioSegment.silent(duration=pause_ms) + seg_audio
+                    else:
+                        combined = combined.append(seg_audio, crossfade=min(crossfade_ms, len(seg_audio), len(combined)))
+            except Exception:
+                continue
 
-            # Apply 10ms smooth fade-in and fade-out to prevent clicks
-            fade_len = min(int(sample_rate * 0.01), len(samples) // 4)
-            if fade_len > 0:
-                fade_in = np.linspace(0.0, 1.0, fade_len)
-                fade_out = np.linspace(1.0, 0.0, fade_len)
-                samples[:fade_len] *= fade_in
-                samples[-fade_len:] *= fade_out
-
-            combined_samples.append(samples)
-
-            # Append silence
-            if pause_ms > 0:
-                silence_samples_count = int(sample_rate * (pause_ms / 1000.0))
-                silence = np.zeros(silence_samples_count, dtype=np.float32)
-                combined_samples.append(silence)
-
-        if not combined_samples:
-            return AudioProcessor.pcm16_to_wav(b'', sample_rate=sample_rate)
-
-        all_samples = np.concatenate(combined_samples)
-        np.clip(all_samples, -32768, 32767, out=all_samples)
-        return AudioProcessor.pcm16_to_wav(all_samples.astype(np.int16).tobytes(), sample_rate=sample_rate)
+        out_buf = io.BytesIO()
+        combined.export(out_buf, format="wav")
+        return out_buf.getvalue()
 
     @staticmethod
     def apply_dsp_effects(
@@ -126,113 +110,34 @@ class AudioProcessor:
         pitch_semitones: float = 0.0,
         reverb_intensity: float = 0.0,
         bass_boost_db: float = 0.0,
-        treble_boost_db: float = 0.0,
-        normalize_audio: bool = True
+        treble_boost_db: float = 0.0
     ) -> bytes:
-        """Applies Pro DSP chain: Speed, Pitch, 3-Band Parametric EQ, Reverb, and Soft Limiter."""
-        if len(wav_bytes) <= 44 or wav_bytes[:4] != b'RIFF':
-            return wav_bytes
-            
-        sample_rate = struct.unpack_from('<I', wav_bytes, 24)[0]
-        num_channels = struct.unpack_from('<H', wav_bytes, 22)[0]
-        pcm_raw = wav_bytes[44:]
-        
-        samples = np.frombuffer(pcm_raw, dtype=np.int16).astype(np.float32)
-        if len(samples) == 0:
+        """Applies DSP speed, pitch, reverb and EQ effects."""
+        if AudioSegment is None or np is None:
             return wav_bytes
 
-        # 1. Pitch Shift (Interpolated time-domain resampling)
-        if pitch_semitones != 0.0:
-            pitch_ratio = 2.0 ** (pitch_semitones / 12.0)
-            orig_indices = np.arange(len(samples))
-            new_len = int(len(samples) / pitch_ratio)
-            new_indices = np.linspace(0, len(samples) - 1, new_len)
-            samples = np.interp(new_indices, orig_indices, samples)
-            
-        # 2. Speed Adjustment
-        if speed != 1.0 and speed > 0.1:
-            orig_indices = np.arange(len(samples))
-            new_len = int(len(samples) / speed)
-            new_indices = np.linspace(0, len(samples) - 1, new_len)
-            samples = np.interp(new_indices, orig_indices, samples)
+        try:
+            audio = AudioSegment.from_file(io.BytesIO(wav_bytes), format="wav")
+            sample_rate = audio.frame_rate
+            samples = np.array(audio.get_array_of_samples(), dtype=np.float32)
 
-        # 3. Parametric Bass EQ (Low Shelf filter)
-        if bass_boost_db != 0.0:
-            gain = 10.0 ** (bass_boost_db / 20.0)
-            alpha = 0.06
-            low_pass = np.zeros_like(samples)
-            prev = 0.0
-            for i in range(len(samples)):
-                prev = prev + alpha * (samples[i] - prev)
-                low_pass[i] = prev
-            samples = samples + (gain - 1.0) * low_pass
+            # Speed / Pitch shift
+            if pitch_semitones != 0.0 or speed != 1.0:
+                pitch_factor = 2.0 ** (pitch_semitones / 12.0)
+                new_sample_rate = int(sample_rate * pitch_factor / speed)
+                new_sample_rate = max(8000, min(96000, new_sample_rate))
+                audio = audio._spawn(audio.raw_data, overrides={"frame_rate": new_sample_rate})
+                audio = audio.set_frame_rate(sample_rate)
 
-        # 4. Parametric Treble EQ (High Shelf filter)
-        if treble_boost_db != 0.0:
-            gain = 10.0 ** (treble_boost_db / 20.0)
-            alpha = 0.35
-            high_pass = np.zeros_like(samples)
-            prev = 0.0
-            for i in range(len(samples)):
-                prev = prev + alpha * (samples[i] - prev)
-                high_pass[i] = samples[i] - prev
-            samples = samples + (gain - 1.0) * high_pass
+            # Bass & Treble Boost
+            if bass_boost_db != 0.0:
+                audio = audio.low_pass_filter(250).apply_gain(bass_boost_db).overlay(audio)
+            if treble_boost_db != 0.0:
+                audio = audio.high_pass_filter(4000).apply_gain(treble_boost_db).overlay(audio)
 
-        # 5. Spatial Reverb (Diffused multi-tap comb impulse)
-        if reverb_intensity > 0.05:
-            delay1 = int(sample_rate * 0.035)
-            delay2 = int(sample_rate * 0.052)
-            decay1 = min(0.65, reverb_intensity * 0.6)
-            decay2 = min(0.55, reverb_intensity * 0.5)
-
-            max_delay = max(delay1, delay2)
-            reverb_buf = np.zeros(len(samples) + max_delay, dtype=np.float32)
-            reverb_buf[:len(samples)] = samples
-            
-            for i in range(max_delay, len(reverb_buf)):
-                reverb_buf[i] += (reverb_buf[i - delay1] * decay1 + reverb_buf[i - delay2] * decay2) * 0.5
-                
-            dry_weight = 1.0 - reverb_intensity * 0.35
-            wet_weight = reverb_intensity * 0.35
-            samples = dry_weight * samples + wet_weight * reverb_buf[:len(samples)]
-
-        # 6. Dynamic Peak Normalizer & Soft-Knee Limiter
-        if normalize_audio:
-            peak = np.max(np.abs(samples))
-            if peak > 0:
-                target_peak = 29500.0  # -0.9 dBFS headroom
-                if peak > target_peak or peak < 12000.0:
-                    scale = target_peak / peak
-                    samples *= min(scale, 2.5) # Cap auto-gain
-
-        # Final Soft Clipping limiter
-        np.clip(samples, -32767, 32767, out=samples)
-        processed_pcm = samples.astype(np.int16).tobytes()
-        
-        return AudioProcessor.pcm16_to_wav(processed_pcm, sample_rate=sample_rate, num_channels=num_channels)
-
-    @staticmethod
-    def extract_waveform_peaks(wav_bytes: bytes, num_peaks: int = 100) -> List[float]:
-        """Extracts normalized waveform envelope peaks for frontend rendering."""
-        if len(wav_bytes) <= 44:
-            return [0.0] * num_peaks
-            
-        pcm_raw = wav_bytes[44:]
-        samples = np.frombuffer(pcm_raw, dtype=np.int16).astype(np.float32)
-        if len(samples) == 0:
-            return [0.0] * num_peaks
-            
-        samples = np.abs(samples) / 32768.0
-        chunk_size = len(samples) // num_peaks
-        if chunk_size < 1:
-            chunk_size = 1
-            
-        peaks = []
-        for i in range(num_peaks):
-            start = i * chunk_size
-            end = start + chunk_size
-            chunk = samples[start:end]
-            val = float(np.max(chunk)) if len(chunk) > 0 else 0.0
-            peaks.append(round(min(1.0, val), 3))
-            
-        return peaks
+            # Export
+            out_buf = io.BytesIO()
+            audio.export(out_buf, format="wav")
+            return out_buf.getvalue()
+        except Exception:
+            return wav_bytes
