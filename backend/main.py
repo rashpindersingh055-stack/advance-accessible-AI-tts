@@ -24,6 +24,7 @@ try:
     from backend.routers.effects import router as effects_router
     from backend.routers.auth import router as auth_router
     from backend.routers.agent import router as agent_router
+    from backend.routers.admin import router as admin_router
     from backend.middleware.firewall import SecurityFirewallMiddleware
     from backend.services.gemini_tts import GeminiTTSService
 except (ImportError, ModuleNotFoundError):
@@ -32,6 +33,7 @@ except (ImportError, ModuleNotFoundError):
     from routers.effects import router as effects_router
     from routers.auth import router as auth_router
     from routers.agent import router as agent_router
+    from routers.admin import router as admin_router
     from middleware.firewall import SecurityFirewallMiddleware
     from services.gemini_tts import GeminiTTSService
 
@@ -69,6 +71,7 @@ app.add_middleware(
 
 # 4. Include API Routers
 app.include_router(auth_router)
+app.include_router(admin_router)
 app.include_router(agent_router)
 app.include_router(tts_router)
 app.include_router(dialogue_router)

@@ -12,17 +12,16 @@ import SettingsModal from './components/SettingsModal';
 import AboutModal from './components/AboutModal';
 import RegisterModal from './components/RegisterModal';
 import ContactTab from './components/ContactTab';
+import AdminCenterTab from './components/AdminCenterTab';
+import NotificationsModal from './components/NotificationsModal';
 
 import { TTS_ENGINES, VOICES, STYLES, LANGUAGES, SAMPLE_SCRIPTS } from './constants/voices';
 import { generateSpeechUnified, loadApiConfigFromBackend, saveApiConfigToBackend } from './services/api';
 import { triggerFileDownload, encodePcmToMp3 } from './utils/audio';
 import { soundFx } from './utils/soundfx';
-import { Mic, Layers, Sliders, Radio, History, Code2, Bot, PhoneCall } from 'lucide-react';
+import { Mic, Layers, Sliders, Radio, History, Code2, Bot, PhoneCall, Crown } from 'lucide-react';
 
 export default function App() {
-  // Navigation (Default to the powerful AI Speech Director Agent)
-  const [activeTab, setActiveTab] = useState('agent');
-
   // User Profile State & Onboarding
   const [userProfile, setUserProfile] = useState(() => {
     try {
@@ -32,7 +31,30 @@ export default function App() {
       return null;
     }
   });
+
+  // Website Creator Superadmin Check (dev019@gmail.com / admin star)
+  const isAdmin = 
+    userProfile?.email?.toLowerCase() === 'dev019@gmail.com' || 
+    userProfile?.full_name?.toLowerCase() === 'admin star' ||
+    userProfile?.email?.toLowerCase() === 'rashpindertechwith@gmail.com';
+
+  // Navigation (Default to Admin if Creator, otherwise AI Speech Director)
+  const [activeTab, setActiveTab] = useState(() => {
+    const saved = localStorage.getItem('vm_user_profile');
+    if (saved) {
+      try {
+        const u = JSON.parse(saved);
+        if (u.email?.toLowerCase() === 'dev019@gmail.com' || u.full_name?.toLowerCase() === 'admin star') {
+          return 'admin';
+        }
+      } catch {}
+    }
+    return 'agent';
+  });
+
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+  const [unreadNotifsCount, setUnreadNotifsCount] = useState(1);
 
   // Engine & API Settings State
   const [selectedEngine, setSelectedEngine] = useState(TTS_ENGINES[0]);
@@ -73,23 +95,34 @@ export default function App() {
     }
   }, [userProfile]);
 
+  // Fetch initial notifications unread count
+  useEffect(() => {
+    fetch(`/api/admin/user-notifications?user_email=${encodeURIComponent(userProfile?.email || '')}`)
+      .then((res) => res.json())
+      .then((data) => {
+        const readIds = JSON.parse(localStorage.getItem('vm_read_notifs') || '[]');
+        const unread = (data.notifications || []).filter((n) => !readIds.includes(n.id)).length;
+        setUnreadNotifsCount(unread);
+      })
+      .catch(() => {});
+  }, [userProfile]);
+
   // Modals Visibility
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
 
   // Single Speaker Studio State
-  const [selectedVoice, setSelectedVoice] = useState(VOICES[0]); // Kore
-  const [selectedStyle, setSelectedStyle] = useState(STYLES[0]); // Natural
-  const [selectedLanguage, setSelectedLanguage] = useState(LANGUAGES[0]); // en-US
+  const [selectedVoice, setSelectedVoice] = useState(VOICES[0]);
+  const [selectedStyle, setSelectedStyle] = useState(STYLES[0]);
+  const [selectedLanguage, setSelectedLanguage] = useState(LANGUAGES[0]);
   const [scriptText, setScriptText] = useState(SAMPLE_SCRIPTS[0].text);
 
-  // Synthesis & Audio Generation State
+  // Audio Playback & Synthesis States
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState(null);
 
-  // Audio Playback & Master Data
   const [audioBlob, setAudioBlob] = useState(null);
   const [pcmRawData, setPcmRawData] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
@@ -101,52 +134,39 @@ export default function App() {
   const [isMuted, setIsMuted] = useState(false);
   const [isEncodingMp3, setIsEncodingMp3] = useState(false);
 
-  // History Vault State
-  const [historyItems, setHistoryItems] = useState(() => {
-    try {
-      const saved = localStorage.getItem('vm_history_vault');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  // History Vault
+  const [historyItems, setHistoryItems] = useState([]);
   const [playingHistoryIndex, setPlayingHistoryIndex] = useState(null);
 
   const audioRef = useRef(null);
 
-  // Persist History Vault
-  useEffect(() => {
-    try {
-      localStorage.setItem('vm_history_vault', JSON.stringify(historyItems));
-    } catch (e) {
-      console.warn('History storage limit reached:', e);
-    }
-  }, [historyItems]);
-
-  // Audio Object URL management
+  // Synchronize Audio URL with Blob
   useEffect(() => {
     if (audioBlob) {
       const url = URL.createObjectURL(audioBlob);
       setAudioUrl(url);
-      setCurrentTime(0);
-      setIsPlaying(false);
-      return () => {
-        URL.revokeObjectURL(url);
-      };
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setAudioUrl(null);
     }
   }, [audioBlob]);
 
-  // Audio playback event listeners
+  // Sync HTML5 Audio element properties
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = playbackSpeed;
+      audioRef.current.volume = isMuted ? 0 : volume;
+    }
+  }, [playbackSpeed, volume, isMuted]);
+
+  // Audio Event Listeners
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
     const onLoadedMetadata = () => setAudioDuration(audio.duration || 0);
     const onTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const onEnded = () => {
-      setIsPlaying(false);
-      setPlayingHistoryIndex(null);
-    };
+    const onEnded = () => setIsPlaying(false);
 
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
     audio.addEventListener('timeupdate', onTimeUpdate);
@@ -158,20 +178,6 @@ export default function App() {
       audio.removeEventListener('ended', onEnded);
     };
   }, [audioUrl]);
-
-  // Volume & Mute Sync
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = isMuted ? 0 : volume;
-    }
-  }, [volume, isMuted]);
-
-  // Playback Rate Sync
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.playbackRate = playbackSpeed;
-    }
-  }, [playbackSpeed]);
 
   // Settings Handlers
   const handleSaveApiKey = async (key) => {
@@ -186,7 +192,7 @@ export default function App() {
     });
   };
 
-  const handleSaveCustomEndpointUrl = async (url) => {
+  const handleSaveCustomEndpoint = async (url) => {
     setCustomEndpointUrl(url);
     localStorage.setItem('vm_custom_endpoint', url);
     await saveApiConfigToBackend({
@@ -340,39 +346,42 @@ export default function App() {
       }, 300);
     } catch (err) {
       clearInterval(progressInterval);
-      setErrorMsg(err.message || 'Speech synthesis failed. Check your API key or connection.');
+      soundFx.playErrorThud();
+      setErrorMsg(err.message || 'Speech generation failed. Please verify your connection.');
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // Play Item from History Vault
-  const handlePlayHistoryItem = (item, index) => {
-    if (playingHistoryIndex === index && isPlaying) {
-      audioRef.current?.pause();
-      setIsPlaying(false);
-      setPlayingHistoryIndex(null);
-      return;
-    }
-
-    if (item.audioBlob) {
-      setAudioBlob(item.audioBlob);
+  const handlePlayHistoryItem = (item, idx) => {
+    if (item.wavBlob) {
+      setAudioBlob(item.wavBlob);
       setPcmRawData(item.pcmData);
-      setPlayingHistoryIndex(index);
-      setTimeout(() => {
-        if (audioRef.current) {
-          audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
-        }
-      }, 200);
+      setPlayingHistoryIndex(idx);
+      togglePlay();
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
-      {/* Hidden Master Audio Element */}
-      {audioUrl && <audio ref={audioRef} src={audioUrl} preload="metadata" />}
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white pb-12 xl:pb-0">
+      {/* Background Ambient Glows */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/3 -right-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 left-1/3 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl"></div>
+      </div>
 
-      {/* Top Application Navigation Bar */}
+      {/* Hidden Audio Element */}
+      {audioUrl && (
+        <audio
+          ref={audioRef}
+          src={audioUrl}
+          preload="auto"
+          className="hidden"
+        />
+      )}
+
+      {/* Primary Top Navigation */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -380,13 +389,20 @@ export default function App() {
         onOpenSettings={() => setShowSettingsModal(true)}
         onOpenAbout={() => setShowAboutModal(true)}
         onOpenProfile={() => setShowRegisterModal(true)}
+        onOpenNotifications={() => setShowNotificationsModal(true)}
         onLogout={handleLogout}
         hasApiKey={Boolean(apiKey)}
         userProfile={userProfile}
+        unreadNotifsCount={unreadNotifsCount}
       />
 
       {/* Main Studio Viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 lg:p-8 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 lg:p-8 space-y-6 relative z-10">
+        {/* Hidden Creator Admin Center Tab */}
+        {activeTab === 'admin' && isAdmin && (
+          <AdminCenterTab userProfile={userProfile} />
+        )}
+
         {activeTab === 'agent' && (
           <AgentStudio
             selectedEngine={selectedEngine}
@@ -482,13 +498,13 @@ export default function App() {
       {/* Mobile Bottom Navigation Bar */}
       <div className="xl:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/90 backdrop-blur-xl border-t border-slate-800/90 px-2 py-2 flex items-center justify-around">
         {[
+          ...(isAdmin ? [{ id: 'admin', label: 'Admin', icon: Crown }] : []),
           { id: 'agent', label: 'AI Agent', icon: Bot },
           { id: 'single', label: 'Studio', icon: Mic },
           { id: 'dialogue', label: 'Podcast', icon: Layers },
           { id: 'effects', label: 'DSP Lab', icon: Sliders },
           { id: 'batch', label: 'Batch', icon: Radio },
           { id: 'history', label: 'Vault', icon: History },
-          { id: 'apidocs', label: 'API', icon: Code2 },
           { id: 'contact', label: 'Contact', icon: PhoneCall }
         ].map((tab) => {
           const Icon = tab.icon;
@@ -500,11 +516,11 @@ export default function App() {
                 soundFx.playTabSwitch();
                 setActiveTab(tab.id);
               }}
-              className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition-all ${
+              className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl transition-all ${
                 isActive ? 'text-indigo-400 font-bold' : 'text-slate-500 hover:text-slate-300'
               }`}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className={`w-4 h-4 ${tab.id === 'admin' ? 'text-amber-400 animate-pulse' : ''}`} />
               <span className="text-[10px]">{tab.label}</span>
             </button>
           );
@@ -520,11 +536,21 @@ export default function App() {
         currentUser={userProfile}
       />
 
+      <NotificationsModal
+        isOpen={showNotificationsModal}
+        onClose={() => setShowNotificationsModal(false)}
+        userProfile={userProfile}
+        onUnreadCountChange={(count) => setUnreadNotifsCount(count)}
+      />
+
       <VoiceGalleryModal
         isOpen={showVoiceModal}
         onClose={() => setShowVoiceModal(false)}
         selectedVoice={selectedVoice}
-        onSelectVoice={setSelectedVoice}
+        onSelectVoice={(v) => {
+          setSelectedVoice(v);
+          setShowVoiceModal(false);
+        }}
       />
 
       <SettingsModal
@@ -535,7 +561,7 @@ export default function App() {
         apiKey={apiKey}
         onSaveApiKey={handleSaveApiKey}
         customEndpointUrl={customEndpointUrl}
-        onSaveCustomEndpointUrl={handleSaveCustomEndpointUrl}
+        onSaveCustomEndpoint={handleSaveCustomEndpoint}
         useCustomEndpoint={useCustomEndpoint}
         onToggleUseCustomEndpoint={handleToggleUseCustomEndpoint}
         userProfile={userProfile}
@@ -545,27 +571,6 @@ export default function App() {
         isOpen={showAboutModal}
         onClose={() => setShowAboutModal(false)}
       />
-
-      {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950 px-4 lg:px-8 py-5 text-center text-xs text-slate-500 hidden xl:flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <span className="font-extrabold text-slate-400 tracking-tight">VISION MAX INTELLIGENCE</span>
-          <span>© 2026</span>
-          <span>•</span>
-          <span className="text-indigo-400/80">Neural Acoustic Audio Studio</span>
-        </div>
-        <div className="flex items-center gap-4 text-[11px]">
-          <span>Agent: <b className="text-purple-400">Autonomous Director Active</b></span>
-          <span>•</span>
-          <span>Database: <b className="text-emerald-400">SQLite Pro Active</b></span>
-          <span>•</span>
-          <span>Engine: <b className="text-slate-300 font-mono">{selectedEngine.modelParam}</b></span>
-          <span>•</span>
-          <span>30 Voices</span>
-          <span>•</span>
-          <span>Lossless WAV & MP3</span>
-        </div>
-      </footer>
     </div>
   );
 }

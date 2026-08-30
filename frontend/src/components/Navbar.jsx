@@ -1,5 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Sparkles, Settings, Info, Radio, Layers, Sliders, History, Code2, User, LogOut, Edit3, ShieldCheck, ChevronDown, Bot, PhoneCall, Volume2, VolumeX } from 'lucide-react';
+import { 
+  Mic, Sparkles, Settings, Info, Radio, Layers, Sliders, History, 
+  Code2, User, LogOut, Edit3, ShieldCheck, ChevronDown, Bot, PhoneCall, 
+  Volume2, VolumeX, Crown, Bell
+} from 'lucide-react';
 import BrandLogo from './BrandLogo';
 import { soundFx } from '../utils/soundfx';
 
@@ -10,15 +14,23 @@ export default function Navbar({
   onOpenSettings,
   onOpenAbout,
   onOpenProfile,
+  onOpenNotifications,
   onLogout,
   hasApiKey,
-  userProfile
+  userProfile,
+  unreadNotifsCount = 0
 }) {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isSoundMuted, setIsSoundMuted] = useState(soundFx.getMutedStatus());
   const profileMenuRef = useRef(null);
 
-  const navTabs = [
+  // Check if current user is the website creator / admin star
+  const isAdmin = 
+    userProfile?.email?.toLowerCase() === 'dev019@gmail.com' || 
+    userProfile?.full_name?.toLowerCase() === 'admin star' ||
+    userProfile?.email?.toLowerCase() === 'rashpindertechwith@gmail.com';
+
+  const baseNavTabs = [
     { id: 'agent', label: 'AI Speech Director', icon: Bot, badge: 'AI Agent', highlight: true },
     { id: 'single', label: 'Neural Studio', icon: Mic, badge: 'Standard' },
     { id: 'dialogue', label: 'Multi-Speaker Podcast', icon: Layers, badge: 'Pro' },
@@ -28,6 +40,14 @@ export default function Navbar({
     { id: 'apidocs', label: 'API Playground', icon: Code2 },
     { id: 'contact', label: 'Contact Us', icon: PhoneCall }
   ];
+
+  // Injected ONLY for the creator (dev019@gmail.com / admin star)
+  const navTabs = isAdmin
+    ? [
+        { id: 'admin', label: 'Admin Command', icon: Crown, badge: 'Creator', highlight: true },
+        ...baseNavTabs
+      ]
+    : baseNavTabs;
 
   const handleTabClick = (tabId) => {
     soundFx.playTabSwitch();
@@ -61,23 +81,28 @@ export default function Navbar({
           {navTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
+            const isCreatorTab = tab.id === 'admin';
             return (
               <button
                 key={tab.id}
                 onClick={() => handleTabClick(tab.id)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all relative ${
                   isActive
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/30'
+                    ? isCreatorTab
+                      ? 'bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 text-white shadow-lg shadow-purple-600/30'
+                      : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/30'
+                    : isCreatorTab
+                    ? 'text-purple-300 hover:text-white bg-purple-950/40 border border-purple-500/40 animate-pulse'
                     : tab.highlight
                     ? 'text-indigo-300 hover:text-white hover:bg-indigo-950/40 border border-indigo-500/20'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : tab.highlight ? 'text-indigo-400 animate-pulse' : 'text-indigo-400'}`} />
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : isCreatorTab ? 'text-amber-400' : 'text-indigo-400'}`} />
                 <span>{tab.label}</span>
                 {tab.badge && (
                   <span className={`text-[9px] px-1.5 py-0.2 rounded-md ${
-                    isActive ? 'bg-white/20 text-white' : tab.highlight ? 'bg-indigo-950 text-indigo-300 border border-indigo-700/50' : 'bg-slate-800 text-indigo-300'
+                    isActive ? 'bg-white/20 text-white' : isCreatorTab ? 'bg-amber-950 text-amber-300 border border-amber-500/50' : 'bg-slate-800 text-indigo-300'
                   }`}>
                     {tab.badge}
                   </span>
@@ -89,6 +114,23 @@ export default function Navbar({
 
         {/* Actions, User Profile Menu, Sound Toggle & Settings */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Notifications Bell Button */}
+          <button
+            onClick={() => {
+              soundFx.playButtonClick();
+              if (onOpenNotifications) onOpenNotifications();
+            }}
+            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white transition-all relative"
+            title="System Notifications"
+          >
+            <Bell className="w-4 h-4" />
+            {unreadNotifsCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-gradient-to-r from-pink-500 to-red-500 text-white text-[9px] font-black flex items-center justify-center animate-bounce shadow-md">
+                {unreadNotifsCount}
+              </span>
+            )}
+          </button>
+
           {/* Pro Sound FX Toggle */}
           <button
             onClick={handleToggleSound}
@@ -110,11 +152,17 @@ export default function Navbar({
                   soundFx.playButtonClick();
                   setIsProfileMenuOpen(!isProfileMenuOpen);
                 }}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition-all cursor-pointer group"
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs text-slate-200 transition-all cursor-pointer group ${
+                  isAdmin 
+                    ? 'bg-purple-950/60 border-purple-500/50 shadow-md shadow-purple-950/50' 
+                    : 'bg-slate-900 hover:bg-slate-850 border-slate-800'
+                }`}
                 title="Account Menu"
               >
-                <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-[11px] font-bold text-white uppercase shadow-sm">
-                  {userProfile.full_name?.charAt(0) || 'U'}
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold text-white uppercase shadow-sm ${
+                  isAdmin ? 'bg-gradient-to-tr from-amber-400 via-purple-500 to-pink-500' : 'bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500'
+                }`}>
+                  {isAdmin ? '👑' : userProfile.full_name?.charAt(0) || 'U'}
                 </div>
                 <span className="font-semibold text-slate-200 max-w-[100px] truncate hidden sm:inline">
                   {userProfile.full_name?.split(' ')[0]}
@@ -127,16 +175,37 @@ export default function Navbar({
                 <div className="absolute right-0 mt-2 w-64 bg-slate-900/95 border border-slate-800 rounded-2xl shadow-2xl p-2 z-50 animate-scale-in backdrop-blur-xl divide-y divide-slate-800/80">
                   {/* User Info Header */}
                   <div className="p-3">
-                    <p className="font-bold text-sm text-white truncate">{userProfile.full_name}</p>
+                    <div className="flex items-center justify-between">
+                      <p className="font-bold text-sm text-white truncate">{userProfile.full_name}</p>
+                      {isAdmin && (
+                        <span className="px-1.5 py-0.5 rounded bg-purple-950 text-[9px] text-purple-300 font-bold border border-purple-800">
+                          Creator
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-indigo-400 truncate font-mono mt-0.5">{userProfile.email}</p>
                     <div className="flex items-center gap-1 mt-2 text-[10px] text-emerald-400 font-semibold bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-emerald-800/50 w-fit">
                       <ShieldCheck className="w-3 h-3" />
-                      <span>{userProfile.auth_method === 'Google Sign-In' ? 'Google Account' : 'Registered Studio User'}</span>
+                      <span>{isAdmin ? 'Superadmin Verified' : 'Registered Studio User'}</span>
                     </div>
                   </div>
 
                   {/* Menu Options */}
                   <div className="py-1 space-y-0.5">
+                    {isAdmin && (
+                      <button
+                        onClick={() => {
+                          soundFx.playButtonClick();
+                          setIsProfileMenuOpen(false);
+                          setActiveTab('admin');
+                        }}
+                        className="w-full px-3 py-2 rounded-xl text-left text-xs font-bold text-purple-300 hover:text-white hover:bg-purple-950/50 flex items-center gap-2.5 transition-colors"
+                      >
+                        <Crown className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Creator Admin Center</span>
+                      </button>
+                    )}
+
                     <button
                       onClick={() => {
                         soundFx.playButtonClick();
