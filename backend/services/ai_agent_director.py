@@ -1,4 +1,4 @@
-"""Autonomous AI Speech Director & Scriptwriter Agent using Official Google Gemini Models."""
+"""Autonomous AI Speech Director & Scriptwriter Agent using Google Gemini 3.6 Flash."""
 import os
 import json
 import re
@@ -25,12 +25,14 @@ VOICES_LIST = [
 
 STYLE_IDS = ["natural", "dramatic", "whispering", "warm", "commercial", "empathetic", "cheer", "mysterious", "intense", "storyteller"]
 
-# Official Google Gemini Scriptwriting / Reasoning Models
+# Primary Gemini Models for Script Generation (Gemini 3.6 Flash First)
 OFFICIAL_SCRIPT_MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.5-pro",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
     "gemini-3.1-flash",
     "gemini-flash-latest",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
     "gemini-1.5-flash",
     "gemini-1.5-pro"
 ]
@@ -62,11 +64,11 @@ class AIAgentDirectorService:
         genre: str = "Horror & Suspense",
         num_speakers: int = 4,
         length: str = "Medium",
-        model_name: Optional[str] = None,
+        model_name: Optional[str] = "gemini-3.6-flash",
         api_key: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Autonomous Multi-Speaker Scriptwriting & Casting via Google Gemini v1beta API.
+        Autonomous Multi-Speaker Scriptwriting & Casting via Google Gemini 3.6 Flash.
         """
         key = api_key or os.getenv("GEMINI_API_KEY", "")
         if not key:
@@ -135,10 +137,9 @@ class AIAgentDirectorService:
         Deliver the complete humanized JSON production script now.
         """
 
-        # Candidate models list with user choice prioritized
-        candidate_models = []
-        if model_name and model_name.strip():
-            candidate_models.append(model_name.strip())
+        # Priority model cascade starting with gemini-3.6-flash
+        primary_model = model_name.strip() if (model_name and model_name.strip()) else "gemini-3.6-flash"
+        candidate_models = [primary_model]
         for m in OFFICIAL_SCRIPT_MODELS:
             if m not in candidate_models:
                 candidate_models.append(m)
@@ -149,7 +150,7 @@ class AIAgentDirectorService:
             for model_id in candidate_models:
                 endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={key}"
                 
-                # Official SystemInstruction + Structured JSON
+                # Protocol 1: Official SystemInstruction + Structured JSON
                 payload = {
                     "systemInstruction": {
                         "parts": [{"text": system_instruction}]
@@ -168,7 +169,7 @@ class AIAgentDirectorService:
                 try:
                     res = await client.post(endpoint, json=payload)
                     if not res.ok:
-                        # Fallback payload with combined parts
+                        # Protocol 2: Fallback payload with combined parts
                         fallback_payload = {
                             "contents": [
                                 {"role": "user", "parts": [{"text": f"{system_instruction}\n\n{user_content}"}]}
@@ -188,7 +189,7 @@ class AIAgentDirectorService:
                         data["model_used"] = model_id
                         return data
                     else:
-                        last_error = f"{model_id}: HTTP {res.status_code} - {res.text[:120]}"
+                        last_error = f"{model_id}: HTTP {res.status_code} - {res.text[:140]}"
                 except Exception as ex:
                     last_error = f"{model_id}: {str(ex)}"
                     continue

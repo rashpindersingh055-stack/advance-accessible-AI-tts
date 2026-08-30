@@ -45,7 +45,7 @@ class AgentScriptRequest(BaseModel):
     genre: str = Field(default="Horror & Suspense", description="Genre or mood of the story")
     num_speakers: int = Field(default=4, ge=1, le=6, description="Number of distinct character voices")
     length: Literal["Short", "Medium", "Long"] = Field(default="Medium", description="Target length")
-    model_name: Optional[str] = Field(default="gemini-2.5-flash", description="Gemini Flash Model for script generation")
+    model_name: Optional[str] = Field(default="gemini-3.6-flash", description="Gemini 3.6 Flash Model for script generation")
     api_key: Optional[str] = Field(default=None, description="Gemini API key")
 
 class CharacterProfile(BaseModel):
@@ -66,7 +66,7 @@ class AgentProductionResponse(BaseModel):
     title: str
     synopsis: str
     genre: str
-    model_used: Optional[str] = "gemini-2.5-flash"
+    model_used: Optional[str] = "gemini-3.6-flash"
     characters: List[CharacterProfile]
     dialogue: List[DialogueSegment]
 

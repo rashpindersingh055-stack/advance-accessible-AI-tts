@@ -18,7 +18,7 @@ export default function AgentStudio({
   const [genre, setGenre] = useState('Horror & Suspense');
   const [numSpeakers, setNumSpeakers] = useState(4);
   const [targetLength, setTargetLength] = useState('Medium');
-  const [scriptModel, setScriptModel] = useState('gemini-2.5-flash');
+  const [scriptModel, setScriptModel] = useState('gemini-3.6-flash');
 
   // Agent Progress Stages
   const [isAgentWorking, setIsAgentWorking] = useState(false);
@@ -174,7 +174,7 @@ export default function AgentStudio({
       ]
     }`;
 
-    const modelsToTry = [scriptModel, 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3.1-flash', 'gemini-flash-latest', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+    const modelsToTry = [scriptModel, 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-flash', 'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-flash'];
 
     for (const modelId of modelsToTry) {
       try {
@@ -502,12 +502,12 @@ export default function AgentStudio({
                 onChange={(e) => setScriptModel(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
-                <option value="gemini-2.5-flash">⚡ Gemini 2.5 Flash (Official Workhorse &amp; Ultra-Fast)</option>
-                <option value="gemini-2.5-pro">🎬 Gemini 2.5 Pro (Deep Cinematic Storyteller)</option>
-                <option value="gemini-3.1-flash">🚀 Gemini 3.1 Flash (Next-Gen Intelligence)</option>
+                <option value="gemini-3.6-flash">⚡ Gemini 3.6 Flash (Official Recommended &amp; Ultra-Fast)</option>
+                <option value="gemini-3.5-flash">🚀 Gemini 3.5 Flash (Ultra-High Speed &amp; Nuanced)</option>
+                <option value="gemini-3.1-flash">⚡ Gemini 3.1 Flash (Next-Gen Intelligence)</option>
                 <option value="gemini-flash-latest">✨ Gemini Flash Latest (Auto-Updated Release)</option>
-                <option value="gemini-1.5-flash">⚡ Gemini 1.5 Flash (High Speed Stable)</option>
-                <option value="gemini-1.5-pro">🎭 Gemini 1.5 Pro (Deep Reasoning)</option>
+                <option value="gemini-2.5-pro">🎬 Gemini 2.5 Pro (Deep Cinematic Storyteller)</option>
+                <option value="gemini-1.5-flash">⚡ Gemini 1.5 Flash (Legacy Fast)</option>
               </select>
             </div>
 
