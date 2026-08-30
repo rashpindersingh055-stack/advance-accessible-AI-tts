@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { User, Mail, Phone, Calendar, Users, Sparkles, CheckCircle2, ShieldCheck, ArrowRight, AlertCircle, LogIn } from 'lucide-react';
 import BrandLogo from './BrandLogo';
 import { loginWithGoogle } from '../services/api';
+import { soundFx } from '../utils/soundfx';
 
 export default function RegisterModal({
   isOpen,
@@ -41,6 +42,7 @@ export default function RegisterModal({
       });
 
       localStorage.setItem('vm_user_profile', JSON.stringify(userProfile));
+      soundFx.playAccountCreated();
       setSuccessMsg(`Signed in with Google as ${targetName}! Notification sent to administration.`);
 
       setTimeout(() => {
@@ -48,6 +50,7 @@ export default function RegisterModal({
         onClose();
       }, 1000);
     } catch (err) {
+      soundFx.playErrorThud();
       setErrorMsg(`Google sign-in error: ${err.message}`);
     } finally {
       setIsGoogleSigningIn(false);
@@ -60,18 +63,22 @@ export default function RegisterModal({
 
     // Validation
     if (!fullName.trim() || fullName.trim().length < 2) {
+      soundFx.playErrorThud();
       setErrorMsg('Please enter your full name (at least 2 characters).');
       return;
     }
     if (!email.trim() || !email.includes('@')) {
+      soundFx.playErrorThud();
       setErrorMsg('Please enter a valid email address.');
       return;
     }
     if (!phone.trim() || phone.trim().length < 7) {
+      soundFx.playErrorThud();
       setErrorMsg('Please enter a valid phone number with country/area code.');
       return;
     }
     if (!age || age < 1 || age > 120) {
+      soundFx.playErrorThud();
       setErrorMsg('Please enter a valid age between 1 and 120.');
       return;
     }
@@ -124,15 +131,19 @@ export default function RegisterModal({
       console.info('Cloud email relay notice:', cloudErr);
     }
 
+    // Save locally
     localStorage.setItem('vm_user_profile', JSON.stringify(profileData));
-    setSuccessMsg('Account registered successfully! Details sent to administration.');
+
+    // Play Welcome Chime
+    soundFx.playAccountCreated();
+
+    setSuccessMsg(isEditMode ? 'Account updated successfully!' : 'Account registered successfully!');
+    setIsSubmitting(false);
 
     setTimeout(() => {
       onUserRegistered(profileData);
       onClose();
     }, 1200);
-
-    setIsSubmitting(false);
   };
 
   return (

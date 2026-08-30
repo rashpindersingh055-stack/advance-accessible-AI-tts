@@ -6,6 +6,7 @@ import {
 import AudioVisualizer from './AudioVisualizer';
 import { VOICES, STYLES } from '../constants/voices';
 import { triggerFileDownload, encodePcmToMp3, base64ToArrayBuffer, pcmToWavBlob } from '../utils/audio';
+import { soundFx } from '../utils/soundfx';
 
 export default function AgentStudio({
   selectedEngine,
@@ -103,8 +104,12 @@ export default function AgentStudio({
 
   // Step 1 & 2: Autonomous Script Writing & Humanizing Pass
   const handleRunAgentScriptwriter = async () => {
-    if (!promptText.trim()) return;
+    if (!promptText.trim()) {
+      soundFx.playErrorThud();
+      return;
+    }
 
+    soundFx.playGenerateStart();
     setErrorMsg(null);
     setIsAgentWorking(true);
     setProductionData(null);
@@ -138,9 +143,13 @@ export default function AgentStudio({
         setProductionData(data);
       }
 
+      // Fanfare on successful script generation!
+      soundFx.playSuccessFanfare();
+
       setAgentStep(2);
       setAgentStepText('Dialogue humanized, emotional inflections applied & voices cast!');
     } catch (err) {
+      soundFx.playErrorThud();
       setErrorMsg(err.message || 'AI Director script generation failed. Please check your API key.');
     } finally {
       setIsAgentWorking(false);
@@ -251,6 +260,8 @@ export default function AgentStudio({
         setProductionProgress(100);
         setAgentStepText('✨ Master Audio Drama successfully produced and ready for playback!');
         
+        soundFx.playAccountCreated();
+
         setTimeout(() => {
           if (audioRef.current) {
             audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
@@ -316,7 +327,9 @@ export default function AgentStudio({
       setAudioDuration(masterPcm.length / 24000);
       setProductionProgress(100);
       setAgentStepText('✨ Master Audio Drama successfully produced and ready for playback!');
+      soundFx.playAccountCreated();
     } catch (err) {
+      soundFx.playErrorThud();
       setErrorMsg(`Audio production failed: ${err.message}`);
     } finally {
       setIsProducingAudio(false);
@@ -326,6 +339,7 @@ export default function AgentStudio({
   // Playback Deck Handlers
   const togglePlay = () => {
     if (!audioRef.current || !audioUrl) return;
+    soundFx.playTransport(!isPlaying);
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
@@ -344,6 +358,7 @@ export default function AgentStudio({
 
   const handleDownloadWav = () => {
     if (!audioBlob) return;
+    soundFx.playDownloadBeep();
     triggerFileDownload(
       audioBlob,
       `VisionMax_AI_Director_${productionData?.title?.replace(/\s+/g, '_') || 'Story'}_${Date.now()}.wav`
@@ -352,6 +367,7 @@ export default function AgentStudio({
 
   const handleDownloadMp3 = async () => {
     if (!pcmRawData) return;
+    soundFx.playDownloadBeep();
     setIsEncodingMp3(true);
     try {
       const mp3Blob = await encodePcmToMp3(pcmRawData.data, pcmRawData.sampleRate);

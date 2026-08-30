@@ -11,11 +11,13 @@ import VoiceGalleryModal from './components/VoiceGalleryModal';
 import SettingsModal from './components/SettingsModal';
 import AboutModal from './components/AboutModal';
 import RegisterModal from './components/RegisterModal';
+import ContactTab from './components/ContactTab';
 
 import { TTS_ENGINES, VOICES, STYLES, LANGUAGES, SAMPLE_SCRIPTS } from './constants/voices';
 import { generateSpeechUnified, loadApiConfigFromBackend, saveApiConfigToBackend } from './services/api';
 import { triggerFileDownload, encodePcmToMp3 } from './utils/audio';
-import { Mic, Layers, Sliders, Radio, History, Code2, Bot } from 'lucide-react';
+import { soundFx } from './utils/soundfx';
+import { Mic, Layers, Sliders, Radio, History, Code2, Bot, PhoneCall } from 'lucide-react';
 
 export default function App() {
   // Navigation (Default to the powerful AI Speech Director Agent)
@@ -217,6 +219,7 @@ export default function App() {
   // Play / Pause Toggle
   const togglePlay = () => {
     if (!audioRef.current || !audioUrl) return;
+    soundFx.playTransport(!isPlaying);
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
@@ -245,6 +248,7 @@ export default function App() {
   // WAV Download Trigger
   const handleDownloadWav = () => {
     if (!audioBlob) return;
+    soundFx.playDownloadBeep();
     triggerFileDownload(
       audioBlob,
       `VisionMax_${selectedVoice.name}_${selectedStyle.id}_${Date.now()}.wav`
@@ -257,6 +261,7 @@ export default function App() {
       if (audioBlob) handleDownloadWav();
       return;
     }
+    soundFx.playDownloadBeep();
     setIsEncodingMp3(true);
     try {
       const mp3Blob = await encodePcmToMp3(pcmRawData.data, pcmRawData.sampleRate);
@@ -275,10 +280,12 @@ export default function App() {
   // Single Speaker TTS Generation Execution
   const handleGenerateTTS = async () => {
     if (!scriptText.trim()) {
+      soundFx.playErrorThud();
       setErrorMsg('Please enter or select a script before synthesizing.');
       return;
     }
 
+    soundFx.playGenerateStart();
     setErrorMsg(null);
     setIsGenerating(true);
     setGenerationProgress(10);
@@ -305,6 +312,9 @@ export default function App() {
       setPcmRawData(result.pcmRawData);
       setAudioDuration(result.duration);
 
+      // Play Celestial Success Fanfare!
+      soundFx.playSuccessFanfare();
+
       // Auto-add to History Vault
       const newHistoryItem = {
         id: 'hist_' + Date.now(),
@@ -317,10 +327,10 @@ export default function App() {
         durationSeconds: result.duration,
         characterCount: scriptText.length,
         timestamp: new Date().toISOString(),
-        audioBlob: result.wavBlob,
+        wavBlob: result.wavBlob,
         pcmData: result.pcmRawData
       };
-      setHistoryItems((prev) => [newHistoryItem, ...prev.slice(0, 49)]);
+      setHistoryItems((prev) => [newHistoryItem, ...prev].slice(0, 50));
 
       // Auto-play synthesized audio
       setTimeout(() => {
@@ -463,6 +473,10 @@ export default function App() {
         {activeTab === 'apidocs' && (
           <ApiDocsTab selectedEngine={selectedEngine} apiKey={apiKey} />
         )}
+
+        {activeTab === 'contact' && (
+          <ContactTab />
+        )}
       </main>
 
       {/* Mobile Bottom Navigation Bar */}
@@ -474,14 +488,18 @@ export default function App() {
           { id: 'effects', label: 'DSP Lab', icon: Sliders },
           { id: 'batch', label: 'Batch', icon: Radio },
           { id: 'history', label: 'Vault', icon: History },
-          { id: 'apidocs', label: 'API', icon: Code2 }
+          { id: 'apidocs', label: 'API', icon: Code2 },
+          { id: 'contact', label: 'Contact', icon: PhoneCall }
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                soundFx.playTabSwitch();
+                setActiveTab(tab.id);
+              }}
               className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition-all ${
                 isActive ? 'text-indigo-400 font-bold' : 'text-slate-500 hover:text-slate-300'
               }`}

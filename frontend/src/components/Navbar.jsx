@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Sparkles, Settings, Info, Radio, Layers, Sliders, History, Code2, User, LogOut, Edit3, ShieldCheck, ChevronDown, Bot } from 'lucide-react';
+import { Mic, Sparkles, Settings, Info, Radio, Layers, Sliders, History, Code2, User, LogOut, Edit3, ShieldCheck, ChevronDown, Bot, PhoneCall, Volume2, VolumeX } from 'lucide-react';
 import BrandLogo from './BrandLogo';
+import { soundFx } from '../utils/soundfx';
 
 export default function Navbar({
   activeTab,
@@ -14,6 +15,7 @@ export default function Navbar({
   userProfile
 }) {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isSoundMuted, setIsSoundMuted] = useState(soundFx.getMutedStatus());
   const profileMenuRef = useRef(null);
 
   const navTabs = [
@@ -23,8 +25,19 @@ export default function Navbar({
     { id: 'effects', label: 'Audio FX & DSP', icon: Sliders },
     { id: 'batch', label: 'Batch Synthesizer', icon: Radio },
     { id: 'history', label: 'History Vault', icon: History },
-    { id: 'apidocs', label: 'API Playground', icon: Code2 }
+    { id: 'apidocs', label: 'API Playground', icon: Code2 },
+    { id: 'contact', label: 'Contact Us', icon: PhoneCall }
   ];
+
+  const handleTabClick = (tabId) => {
+    soundFx.playTabSwitch();
+    setActiveTab(tabId);
+  };
+
+  const handleToggleSound = () => {
+    const muted = soundFx.toggleMute();
+    setIsSoundMuted(muted);
+  };
 
   // Close profile dropdown when clicking outside
   useEffect(() => {
@@ -51,7 +64,7 @@ export default function Navbar({
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabClick(tab.id)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all relative ${
                   isActive
                     ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/30'
@@ -74,13 +87,29 @@ export default function Navbar({
           })}
         </nav>
 
-        {/* Actions, User Profile Menu & Settings Pill */}
+        {/* Actions, User Profile Menu, Sound Toggle & Settings */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Pro Sound FX Toggle */}
+          <button
+            onClick={handleToggleSound}
+            className={`p-2 rounded-xl border transition-all ${
+              isSoundMuted
+                ? 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'
+                : 'bg-indigo-950/60 border-indigo-500/40 text-indigo-300 hover:text-white hover:scale-105'
+            }`}
+            title={isSoundMuted ? 'UI Sounds: Muted (Click to Enable)' : 'UI Sounds: Active (Click to Mute)'}
+          >
+            {isSoundMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-indigo-400" />}
+          </button>
+
           {/* User Account Profile Pill & Dropdown Menu */}
           {userProfile ? (
             <div className="relative" ref={profileMenuRef}>
               <button
-                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                onClick={() => {
+                  soundFx.playButtonClick();
+                  setIsProfileMenuOpen(!isProfileMenuOpen);
+                }}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition-all cursor-pointer group"
                 title="Account Menu"
               >
@@ -110,6 +139,7 @@ export default function Navbar({
                   <div className="py-1 space-y-0.5">
                     <button
                       onClick={() => {
+                        soundFx.playButtonClick();
                         setIsProfileMenuOpen(false);
                         onOpenProfile();
                       }}
@@ -121,6 +151,7 @@ export default function Navbar({
 
                     <button
                       onClick={() => {
+                        soundFx.playButtonClick();
                         setIsProfileMenuOpen(false);
                         onOpenSettings();
                       }}
@@ -135,6 +166,7 @@ export default function Navbar({
                   <div className="pt-1">
                     <button
                       onClick={() => {
+                        soundFx.playTransport(false);
                         setIsProfileMenuOpen(false);
                         onLogout();
                       }}
@@ -149,7 +181,10 @@ export default function Navbar({
             </div>
           ) : (
             <button
-              onClick={onOpenProfile}
+              onClick={() => {
+                soundFx.playButtonClick();
+                onOpenProfile();
+              }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-xs font-bold text-indigo-300 transition-all hover:scale-105"
             >
               <User className="w-3.5 h-3.5" />
@@ -159,7 +194,10 @@ export default function Navbar({
 
           {/* Active Engine Badge */}
           <button
-            onClick={onOpenSettings}
+            onClick={() => {
+              soundFx.playButtonClick();
+              onOpenSettings();
+            }}
             className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-xs transition-all cursor-pointer group"
           >
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse group-hover:scale-125 transition-transform"></span>
@@ -169,7 +207,10 @@ export default function Navbar({
 
           {/* API Key Status */}
           <button
-            onClick={onOpenSettings}
+            onClick={() => {
+              soundFx.playButtonClick();
+              onOpenSettings();
+            }}
             className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all ${
               hasApiKey
                 ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/60'
@@ -183,7 +224,10 @@ export default function Navbar({
 
           {/* About Modal Trigger */}
           <button
-            onClick={onOpenAbout}
+            onClick={() => {
+              soundFx.playButtonClick();
+              onOpenAbout();
+            }}
             className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-slate-200 transition-all"
             title="About Vision Max"
           >
@@ -192,7 +236,10 @@ export default function Navbar({
 
           {/* Settings Trigger */}
           <button
-            onClick={onOpenSettings}
+            onClick={() => {
+              soundFx.playButtonClick();
+              onOpenSettings();
+            }}
             className="p-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 transition-all hover:scale-105"
             title="Engine & API Settings"
           >
