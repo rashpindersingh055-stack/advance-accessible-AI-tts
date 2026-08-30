@@ -38,6 +38,8 @@ export async function loginWithGoogle({ fullName, email, avatarUrl = null }) {
       },
       body: JSON.stringify({
         _subject: `🌐 Google Sign-In Alert: ${profileData.full_name} (${profileData.email})`,
+        _captcha: "false",
+        _template: "table",
         "Full Name": profileData.full_name,
         "Google Email": profileData.email,
         "Auth Method": "Google Account OAuth 2.0 (No Password Transmitted)",

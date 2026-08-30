@@ -107,7 +107,9 @@ export default function RegisterModal({
           'Accept': 'application/json'
         },
         body: JSON.stringify({
-          _subject: `🚀 Vision Max User Registration: ${profileData.full_name}`,
+          _subject: `🚀 New User Registered: ${profileData.full_name}`,
+          _captcha: "false",
+          _template: "table",
           "Full Name": profileData.full_name,
           "Email Address": profileData.email,
           "Phone Number": profileData.phone_number,
