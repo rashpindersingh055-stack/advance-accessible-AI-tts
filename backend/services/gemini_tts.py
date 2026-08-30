@@ -275,7 +275,11 @@ class GeminiTTSService:
             custom_endpoint=custom_endpoint
         )
 
-        from backend.services.audio_processor import AudioProcessor
+        try:
+            from backend.services.audio_processor import AudioProcessor
+        except (ImportError, ModuleNotFoundError):
+            from services.audio_processor import AudioProcessor
+
         wav_bytes = AudioProcessor.pcm16_to_wav(pcm_bytes, sample_rate=sample_rate, num_channels=1)
         duration_sec = len(pcm_bytes) / (sample_rate * 2)
         return wav_bytes, round(duration_sec, 2)
