@@ -24,8 +24,11 @@ Base.metadata.create_all(bind=engine)
 
 router = APIRouter(prefix="/api/auth", tags=["User Authentication & API Storage"])
 
-# Local Persistent Settings Storage File (for fast restore)
-SETTINGS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "saved_api_config.json")
+# Local Persistent Settings Storage File (for fast restore with Vercel /tmp support)
+if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+    SETTINGS_FILE = "/tmp/saved_api_config.json"
+else:
+    SETTINGS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "saved_api_config.json")
 
 def load_file_settings() -> dict:
     if os.path.exists(SETTINGS_FILE):
