@@ -19,8 +19,11 @@ except (ImportError, ModuleNotFoundError):
     from models.schemas import UserRegisterRequest, UserResponse, ApiConfigSaveRequest, ApiConfigResponse, GoogleLoginRequest
     from services.email_service import EmailService
 
-# Auto create or migrate tables
-Base.metadata.create_all(bind=engine)
+# Auto create or migrate tables safely
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as e:
+    print(f"Database init notice: {e}")
 
 router = APIRouter(prefix="/api/auth", tags=["User Authentication & API Storage"])
 

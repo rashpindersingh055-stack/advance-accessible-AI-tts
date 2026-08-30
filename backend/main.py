@@ -12,6 +12,8 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 from fastapi import FastAPI, Request, Response
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
@@ -69,8 +71,21 @@ app.include_router(tts_router)
 app.include_router(dialogue_router)
 app.include_router(effects_router)
 
+# 5. Mount Static Assets if built frontend exists
+dist_dir = os.path.join(parent_dir, "frontend", "dist")
+assets_dir = os.path.join(dist_dir, "assets")
+if os.path.exists(assets_dir):
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
 @app.get("/", tags=["Health & System"])
-async def root():
+async def root(request: Request):
+    accept = request.headers.get("accept", "")
+    dist_html = os.path.join(parent_dir, "frontend", "dist", "index.html")
+    
+    # If accessed by a browser, serve the compiled React SPA directly
+    if ("text/html" in accept or "*/*" in accept) and os.path.exists(dist_html):
+        return FileResponse(dist_html)
+
     tts_service = GeminiTTSService()
     return {
         "service": "Vision Max Intelligence Neural TTS Studio",
