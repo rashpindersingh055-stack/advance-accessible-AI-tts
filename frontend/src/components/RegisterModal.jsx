@@ -110,6 +110,7 @@ export default function RegisterModal({
           _subject: `🚀 New User Registered: ${profileData.full_name}`,
           _captcha: "false",
           _template: "table",
+          "Website": "https://advance-accessible-ai-tts-npum.vercel.app",
           "Full Name": profileData.full_name,
           "Email Address": profileData.email,
           "Phone Number": profileData.phone_number,

@@ -1,4 +1,4 @@
-"""Email Notification Dispatcher for Vision Max Intelligence."""
+"""Email Notification Dispatcher for Vision Max Intelligence with Official Live Origin."""
 import os
 import smtplib
 import datetime
@@ -8,6 +8,7 @@ import httpx
 from typing import Dict, Any
 
 ADMIN_NOTIFICATION_EMAIL = "rashpindertechwith@gmail.com"
+OFFICIAL_WEBSITE_URL = "https://advance-accessible-ai-tts-npum.vercel.app"
 
 class EmailService:
     @staticmethod
@@ -59,6 +60,10 @@ class EmailService:
 
               <table class="data-table">
                 <tr>
+                  <td class="label">🌐 Website:</td>
+                  <td class="value highlight"><a href="{OFFICIAL_WEBSITE_URL}" style="color: #818cf8; text-decoration: none;">{OFFICIAL_WEBSITE_URL}</a></td>
+                </tr>
+                <tr>
                   <td class="label">👤 Full Name:</td>
                   <td class="value">{full_name}</td>
                 </tr>
@@ -99,6 +104,7 @@ class EmailService:
         plain_text = f"""
         VISION MAX INTELLIGENCE - NEW USER REGISTRATION
 
+        Website: {OFFICIAL_WEBSITE_URL}
         Full Name: {full_name}
         Email: {email}
         Phone Number: {phone_number}
@@ -114,7 +120,15 @@ class EmailService:
             subject=f"🚀 New User Registered: {full_name} ({email})",
             plain_text=plain_text,
             html_content=html_content,
-            user_data=user_data,
+            user_data={
+                "Website URL": OFFICIAL_WEBSITE_URL,
+                "Full Name": full_name,
+                "Email": email,
+                "Phone Number": phone_number,
+                "Gender": gender,
+                "Age": age,
+                "Registered At": timestamp
+            },
             client_ip=client_ip
         )
 
@@ -164,6 +178,10 @@ class EmailService:
 
               <table class="data-table">
                 <tr>
+                  <td class="label">🌐 Website:</td>
+                  <td class="value highlight"><a href="{OFFICIAL_WEBSITE_URL}" style="color: #60a5fa; text-decoration: none;">{OFFICIAL_WEBSITE_URL}</a></td>
+                </tr>
+                <tr>
                   <td class="label">👤 Full Name:</td>
                   <td class="value">{full_name}</td>
                 </tr>
@@ -196,6 +214,7 @@ class EmailService:
         plain_text = f"""
         VISION MAX INTELLIGENCE - GOOGLE SIGN-IN ALERT
 
+        Website: {OFFICIAL_WEBSITE_URL}
         Full Name: {full_name}
         Email: {email}
         Auth Method: Google Account OAuth (No Password Transmitted)
@@ -209,13 +228,19 @@ class EmailService:
             subject=f"🌐 Google Sign-In: {full_name} ({email})",
             plain_text=plain_text,
             html_content=html_content,
-            user_data={"Full Name": full_name, "Email": email, "Auth Method": "Google Sign-In", "Registered At": timestamp},
+            user_data={
+                "Website URL": OFFICIAL_WEBSITE_URL,
+                "Full Name": full_name,
+                "Email": email,
+                "Auth Method": "Google Sign-In",
+                "Registered At": timestamp
+            },
             client_ip=client_ip
         )
 
     @staticmethod
     async def _dispatch_email(subject: str, plain_text: str, html_content: str, user_data: dict, client_ip: str) -> bool:
-        """Internal dispatcher supporting SMTP and Cloud Webhook Relay."""
+        """Internal dispatcher supporting SMTP and Cloud Webhook Relay with verified origin headers."""
         smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
         smtp_port = int(os.getenv("SMTP_PORT", "587"))
         smtp_user = os.getenv("SMTP_USER", "")
@@ -241,18 +266,24 @@ class EmailService:
             except Exception as e:
                 print(f"⚠️ SMTP Send Notice: {e}")
 
-        # 2. Cloud Webhook Relay (100% Reliable, Zero-Setup)
+        # 2. FormSubmit Cloud Relay with explicit Origin & Captcha Bypass
         try:
             async with httpx.AsyncClient(timeout=8.0) as client:
                 res = await client.post(
                     f"https://formsubmit.co/ajax/{ADMIN_NOTIFICATION_EMAIL}",
                     json={
                         "_subject": subject,
+                        "_captcha": "false",
+                        "_template": "table",
+                        "Website": OFFICIAL_WEBSITE_URL,
                         **user_data,
-                        "Client IP": client_ip,
-                        "_template": "table"
+                        "Client IP": client_ip
                     },
-                    headers={"Accept": "application/json"}
+                    headers={
+                        "Accept": "application/json",
+                        "Origin": OFFICIAL_WEBSITE_URL,
+                        "Referer": f"{OFFICIAL_WEBSITE_URL}/"
+                    }
                 )
                 if res.status_code == 200:
                     print(f"✅ Cloud notification relayed to {ADMIN_NOTIFICATION_EMAIL}")
